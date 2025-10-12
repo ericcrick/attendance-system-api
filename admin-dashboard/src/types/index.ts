@@ -53,6 +53,7 @@ export interface Shift {
   updatedAt: string;
 }
 
+// src/types/index.ts - Update Employee interface
 export interface Employee {
   id: string;
   employeeId: string;
@@ -62,6 +63,7 @@ export interface Employee {
   email?: string;
   phone?: string;
   department: string;
+  departmentId?: string;
   position: string;
   rfidCardId?: string;
   pinCode?: string;
@@ -126,4 +128,57 @@ export interface DashboardStats {
   onTime: number;
   late: number;
   totalShifts: number;
+}
+
+
+
+export enum LeaveType {
+  ANNUAL = 'ANNUAL',
+  SICK = 'SICK',
+  PERSONAL = 'PERSONAL',
+  MATERNITY = 'MATERNITY',
+  PATERNITY = 'PATERNITY',
+  UNPAID = 'UNPAID',
+  STUDY = 'STUDY',
+  PASS = 'PASS',
+  OTHER = 'OTHER',
+}
+
+export enum LeaveStatus {
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  CANCELLED = 'CANCELLED',
+}
+
+export interface Department {
+  id: string;
+  name: string;
+  code: string;
+  description?: string;
+  managerName?: string;
+  managerEmail?: string;
+  isActive: boolean;
+  employees?: Employee[];
+  employeeCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Leave {
+  id: string;
+  employeeId: string;
+  employee: Employee;
+  leaveType: LeaveType;
+  startDate: string;
+  endDate: string;
+  daysCount: number;
+  reason: string;
+  status: LeaveStatus;
+  reviewedBy?: string;
+  reviewComments?: string;
+  reviewedAt?: string;
+  attachmentUrl?: string;
+  createdAt: string;
+  updatedAt: string;
 }

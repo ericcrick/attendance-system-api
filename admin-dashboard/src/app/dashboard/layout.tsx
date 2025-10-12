@@ -12,6 +12,7 @@ import {
   LogOut,
   Menu,
   X,
+  Building2,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useState } from 'react';
@@ -19,6 +20,8 @@ import { useState } from 'react';
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Employees', href: '/dashboard/employees', icon: Users },
+  { name: 'Departments', href: '/dashboard/departments', icon: Building2 }, // Add this
+  { name: 'Leaves', href: '/dashboard/leaves', icon: Calendar }, // Add this
   { name: 'Attendance', href: '/dashboard/attendance', icon: Clock },
   { name: 'Shifts', href: '/dashboard/shifts', icon: Calendar },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
@@ -67,9 +70,8 @@ export default function DashboardLayout({
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-56 bg-white border-r border-slate-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className={`fixed inset-y-0 left-0 z-50 w-56 bg-white border-r border-slate-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
@@ -98,11 +100,10 @@ export default function DashboardLayout({
                   key={item.name}
                   href={item.href}
                   onClick={() => setSidebarOpen(false)}
-                  className={`flex items-center space-x-2.5 px-3 py-2 rounded text-sm font-medium transition-colors ${
-                    isActive
+                  className={`flex items-center space-x-2.5 px-3 py-2 rounded text-sm font-medium transition-colors ${isActive
                       ? 'bg-blue-50 text-blue-600'
                       : 'text-slate-700 hover:bg-slate-100'
-                  }`}
+                    }`}
                 >
                   <Icon className="w-4 h-4" />
                   <span>{item.name}</span>

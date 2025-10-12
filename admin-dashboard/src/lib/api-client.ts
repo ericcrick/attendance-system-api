@@ -373,3 +373,48 @@ export const attendanceApi = {
 
   verify: (data: any) => apiClient.post('/attendance/verify', data),
 };
+
+
+
+// Departments API
+export const departmentsApi = {
+  getAll: (includeInactive?: boolean) =>
+    apiClient.get(`/departments${includeInactive ? '?includeInactive=true' : ''}`),
+
+  getById: (id: string) => apiClient.get(`/departments/${id}`),
+
+  create: (data: any) => apiClient.post('/departments', data),
+
+  update: (id: string, data: any) => apiClient.patch(`/departments/${id}`, data),
+
+  delete: (id: string) => apiClient.delete(`/departments/${id}`),
+
+  toggle: (id: string) => apiClient.patch(`/departments/${id}/toggle`, {}),
+
+  getStatistics: () => apiClient.get('/departments/statistics'),
+};
+
+// Leaves API
+export const leavesApi = {
+  getAll: (startDate?: string, endDate?: string, status?: string, employeeId?: string) => {
+    const queryParams: string[] = [];
+    if (startDate) queryParams.push(`startDate=${encodeURIComponent(startDate)}`);
+    if (endDate) queryParams.push(`endDate=${encodeURIComponent(endDate)}`);
+    if (status) queryParams.push(`status=${encodeURIComponent(status)}`);
+    if (employeeId) queryParams.push(`employeeId=${encodeURIComponent(employeeId)}`);
+    const queryString = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
+    return apiClient.get(`/leaves${queryString}`);
+  },
+
+  getById: (id: string) => apiClient.get(`/leaves/${id}`),
+
+  create: (data: any) => apiClient.post('/leaves', data),
+
+  update: (id: string, data: any) => apiClient.patch(`/leaves/${id}`, data),
+
+  review: (id: string, data: any) => apiClient.patch(`/leaves/${id}/review`, data),
+
+  delete: (id: string) => apiClient.delete(`/leaves/${id}`),
+
+  getStatistics: () => apiClient.get('/leaves/statistics'),
+};
