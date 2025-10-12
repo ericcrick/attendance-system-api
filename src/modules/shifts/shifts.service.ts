@@ -127,21 +127,39 @@ export class ShiftsService {
         return null;
     }
 
+    // In shifts.service.ts
+
     private validateShiftTimes(startTime: string, endTime: string): void {
         const start = this.timeToMinutes(startTime);
         const end = this.timeToMinutes(endTime);
 
-        if (start >= end) {
+        // Calculate duration, accounting for overnight shifts
+        let durationMinutes: number;
+        if (end < start) {
+            // Overnight shift (crosses midnight)
+            durationMinutes = (24 * 60 - start) + end;
+        } else if (end === start) {
             throw new BadRequestException(
-                'Shift end time must be after start time',
+                'Shift start and end times cannot be the same',
             );
+        } else {
+            // Same-day shift
+            durationMinutes = end - start;
         }
 
         // Ensure minimum shift duration (e.g., 4 hours)
         const minDurationMinutes = 240; // 4 hours
-        if (end - start < minDurationMinutes) {
+        if (durationMinutes < minDurationMinutes) {
             throw new BadRequestException(
                 'Shift duration must be at least 4 hours',
+            );
+        }
+
+        // Ensure maximum shift duration (e.g., 12 hours)
+        const maxDurationMinutes = 720; // 12 hours
+        if (durationMinutes > maxDurationMinutes) {
+            throw new BadRequestException(
+                'Shift duration cannot exceed 12 hours',
             );
         }
     }
