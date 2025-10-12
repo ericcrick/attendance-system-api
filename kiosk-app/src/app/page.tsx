@@ -73,7 +73,7 @@ export default function Home() {
               <span>Clock Out</span>
             </div>
             <div className="w-px h-3 bg-gray-300" />
-            <span>© 2024 Attendance System</span>
+            <span>© 2025 Attendance System</span>
           </div>
         </div>
       </footer>

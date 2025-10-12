@@ -134,7 +134,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <p className="text-center text-sm text-gray-600 mt-6">
-          © 2024 Attendance System. All rights reserved.
+          © 2025 Attendance System. All rights reserved.
         </p>
       </div>
     </div>
