@@ -40,10 +40,9 @@ export class AttendanceService {
                 if (!verifyDto.employeeId || !verifyDto.pinCode) {
                     throw new BadRequestException('Employee ID and PIN are required');
                 }
-                // Use findByEmployeeId instead of findOne (which expects UUID)
                 employee = await this.employeesService.findByEmployeeId(verifyDto.employeeId);
                 const isPinValid = await this.employeesService.verifyPin(
-                    employee.id, // Use the UUID for PIN verification
+                    employee.id,
                     verifyDto.pinCode,
                 );
                 if (!isPinValid) {
@@ -55,7 +54,6 @@ export class AttendanceService {
                 if (!verifyDto.faceEncoding) {
                     throw new BadRequestException('Face encoding is required');
                 }
-                // Find employee by face encoding match
                 employee = await this.findEmployeeByFaceEncoding(
                     verifyDto.faceEncoding,
                 );
@@ -68,7 +66,6 @@ export class AttendanceService {
                 throw new BadRequestException('Invalid authentication method');
         }
 
-        // Check if employee is active
         if (employee.status !== 'ACTIVE') {
             throw new UnauthorizedException('Employee account is not active');
         }
@@ -87,7 +84,6 @@ export class AttendanceService {
     }
 
     async clockIn(clockInDto: ClockInDto): Promise<Attendance> {
-        // Verify employee first
         const verifyDto: VerifyEmployeeDto = {
             method: clockInDto.method,
             rfidCardId: clockInDto.rfidCardId,
@@ -98,36 +94,44 @@ export class AttendanceService {
 
         const { employee } = await this.verifyEmployee(verifyDto);
 
-        // Check if employee already clocked in today
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
 
-        const existingClockIn = await this.attendanceRepository.findOne({
+        // Check if employee has any attendance record for today
+        const todayAttendance = await this.attendanceRepository.findOne({
             where: {
                 employeeId: employee.id,
                 clockInTime: Between(today, tomorrow),
-                clockOutTime: null as any,
+            },
+            order: {
+                clockInTime: 'DESC',
             },
         });
 
-        if (existingClockIn) {
-            throw new BadRequestException(
-                'Employee has already clocked in today and not clocked out yet',
-            );
+        if (todayAttendance) {
+            // If they haven't clocked out yet
+            if (!todayAttendance.clockOutTime) {
+                throw new BadRequestException(
+                    'You have already clocked in today and have not clocked out yet. Please clock out before clocking in again.',
+                );
+            }
+            // If they have already completed a full cycle (clocked in and out)
+            else {
+                throw new BadRequestException(
+                    'You have already completed your attendance for today. You clocked in and out successfully.',
+                );
+            }
         }
 
-        // Get full employee details with shift
         const fullEmployee = await this.employeesService.findOne(employee.id);
 
-        // Determine attendance status (on time or late)
         const clockInTime = new Date();
         const status = fullEmployee.shift.isLateArrival(clockInTime)
             ? AttendanceStatus.LATE
             : AttendanceStatus.ON_TIME;
 
-        // Create attendance record
         const attendance = this.attendanceRepository.create({
             employeeId: employee.id,
             clockInTime,
@@ -141,7 +145,6 @@ export class AttendanceService {
     }
 
     async clockOut(clockOutDto: ClockOutDto): Promise<Attendance> {
-        // Verify employee first
         const verifyDto: VerifyEmployeeDto = {
             method: clockOutDto.method,
             rfidCardId: clockOutDto.rfidCardId,
@@ -152,12 +155,34 @@ export class AttendanceService {
 
         const { employee } = await this.verifyEmployee(verifyDto);
 
-        // Find active clock-in record for today
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
 
+        // First, check if there's an already completed attendance (clocked in and out)
+        const completedAttendance = await this.attendanceRepository.findOne({
+            where: {
+                employeeId: employee.id,
+                clockInTime: Between(today, tomorrow),
+            },
+            order: {
+                clockInTime: 'DESC',
+            },
+        });
+
+        if (completedAttendance && completedAttendance.clockOutTime) {
+            const clockOutTimeFormatted = completedAttendance.clockOutTime.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true,
+            });
+            throw new BadRequestException(
+                `You have already clocked out today at ${clockOutTimeFormatted}. You cannot clock out again.`,
+            );
+        }
+
+        // Find active clock-in record (not clocked out yet)
         const attendance = await this.attendanceRepository.findOne({
             where: {
                 employeeId: employee.id,
@@ -168,7 +193,7 @@ export class AttendanceService {
 
         if (!attendance) {
             throw new BadRequestException(
-                'No active clock-in record found for today',
+                'No active clock-in record found for today. Please clock in first before clocking out.',
             );
         }
 
@@ -258,7 +283,6 @@ export class AttendanceService {
             .orderBy('attendance.clockInTime', 'DESC')
             .getMany();
 
-        // Calculate statistics
         const totalRecords = attendances.length;
         const onTime = attendances.filter(
             (a) => a.status === AttendanceStatus.ON_TIME,
@@ -302,16 +326,12 @@ export class AttendanceService {
     private async findEmployeeByFaceEncoding(
         faceEncoding: number[],
     ): Promise<any> {
-        // Get all active employees with face encodings
         const employees = await this.employeesService.findAll(false);
-
-        // Filter employees who have face encodings
         const employeesWithFaces = employees.filter((emp) => emp.faceEncoding);
 
-        // Find best match using cosine similarity
         let bestMatch: Employee | null = null;
         let highestSimilarity = 0;
-        const threshold = 0.6; // Similarity threshold (adjust as needed)
+        const threshold = 0.6;
 
         for (const employee of employeesWithFaces) {
             const similarity = this.calculateCosineSimilarity(
