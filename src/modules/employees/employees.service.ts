@@ -129,10 +129,12 @@ export class EmployeesService {
   }
 
   async findByEmployeeId(employeeId: string): Promise<Employee> {
-    const employee = await this.employeesRepository.findOne({
-      where: { employeeId },
-      relations: ['shift'],
-    });
+    // Case-insensitive search using ILIKE (PostgreSQL) or LOWER
+    const employee = await this.employeesRepository
+      .createQueryBuilder('employee')
+      .leftJoinAndSelect('employee.shift', 'shift')
+      .where('LOWER(employee.employee_id) = LOWER(:employeeId)', { employeeId })
+      .getOne();
 
     if (!employee) {
       throw new NotFoundException(
@@ -144,10 +146,12 @@ export class EmployeesService {
   }
 
   async findByRfidCard(rfidCardId: string): Promise<Employee | null> {
-    return this.employeesRepository.findOne({
-      where: { rfidCardId },
-      relations: ['shift'],
-    });
+    // Case-insensitive search for RFID card
+    return this.employeesRepository
+      .createQueryBuilder('employee')
+      .leftJoinAndSelect('employee.shift', 'shift')
+      .where('LOWER(employee.rfid_card_id) = LOWER(:rfidCardId)', { rfidCardId })
+      .getOne();
   }
 
   async update(id: string, updateEmployeeDto: UpdateEmployeeDto): Promise<Employee> {

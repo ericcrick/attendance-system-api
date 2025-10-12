@@ -8,6 +8,7 @@ import {
     MinLength,
     MaxLength,
     Matches,
+    IsArray,
 } from 'class-validator';
 import { EmploymentStatus } from '../../../common/enums';
 
@@ -236,8 +237,9 @@ export class AssignPinDto {
 
 export class AssignFaceEncodingDto {
     @ApiProperty({
-        description: 'Face encoding data (array of numbers)',
-        example: [0.123, -0.456, 0.789],
+        description: 'Face encoding data (array of 128 numbers)',
+        example: [0.123, -0.456, /* ...128 numbers */],
     })
+    @IsArray()
     faceEncoding: number[];
 }

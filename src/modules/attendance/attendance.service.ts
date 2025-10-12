@@ -21,7 +21,8 @@ export class AttendanceService {
     ) { }
 
     async verifyEmployee(verifyDto: VerifyEmployeeDto): Promise<any> {
-        let employee: Employee | null = null
+        let employee: Employee | null = null;
+
         switch (verifyDto.method) {
             case AuthMethod.RFID:
                 if (!verifyDto.rfidCardId) {
@@ -39,9 +40,10 @@ export class AttendanceService {
                 if (!verifyDto.employeeId || !verifyDto.pinCode) {
                     throw new BadRequestException('Employee ID and PIN are required');
                 }
-                employee = await this.employeesService.findOne(verifyDto.employeeId);
+                // Use findByEmployeeId instead of findOne (which expects UUID)
+                employee = await this.employeesService.findByEmployeeId(verifyDto.employeeId);
                 const isPinValid = await this.employeesService.verifyPin(
-                    verifyDto.employeeId,
+                    employee.id, // Use the UUID for PIN verification
                     verifyDto.pinCode,
                 );
                 if (!isPinValid) {
@@ -299,7 +301,7 @@ export class AttendanceService {
 
     private async findEmployeeByFaceEncoding(
         faceEncoding: number[],
-    ): Promise<Employee | null> {
+    ): Promise<any> {
         // Get all active employees with face encodings
         const employees = await this.employeesService.findAll(false);
 
