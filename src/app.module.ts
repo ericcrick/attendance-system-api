@@ -9,6 +9,8 @@ import { EmployeesModule } from './modules/employees/employees.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AttendanceModule } from './modules/attendance/attendance.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
+import { DepartmentsModule } from './modules/departments/departments.module';
+import { LeavesModule } from './modules/leaves/leaves.module';
 
 @Module({
   imports: [
@@ -54,6 +56,8 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
     ShiftsModule,
     EmployeesModule,
     AttendanceModule,
+    DepartmentsModule,
+    LeavesModule
   ],
   controllers: [],
   providers: [

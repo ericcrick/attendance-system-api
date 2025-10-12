@@ -1,3 +1,5 @@
+// src/modules/employees/dto/create-employee.dto.ts
+
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
     IsString,
@@ -12,115 +14,172 @@ import {
 } from 'class-validator';
 import { EmploymentStatus } from '../../../common/enums';
 
+// export class CreateEmployeeDto {
+//     @ApiProperty({
+//         description: 'Employee ID number',
+//         example: 'EMP-001',
+//     })
+//     @IsString()
+//     @MinLength(3)
+//     @MaxLength(50)
+//     employeeId: string;
+
+//     @ApiProperty({
+//         description: 'First name',
+//         example: 'John',
+//     })
+//     @IsString()
+//     @MinLength(2)
+//     @MaxLength(100)
+//     firstName: string;
+
+//     @ApiProperty({
+//         description: 'Last name',
+//         example: 'Doe',
+//     })
+//     @IsString()
+//     @MinLength(2)
+//     @MaxLength(100)
+//     lastName: string;
+
+//     @ApiPropertyOptional({
+//         description: 'Email address',
+//         example: 'john.doe@military.com',
+//     })
+//     @IsOptional()
+//     @IsEmail()
+//     email?: string;
+
+//     @ApiPropertyOptional({
+//         description: 'Phone number',
+//         example: '+1234567890',
+//     })
+//     @IsOptional()
+//     @IsString()
+//     @Matches(/^\+?[1-9]\d{1,14}$/, {
+//         message: 'Phone number must be in valid international format',
+//     })
+//     phone?: string;
+
+//     @ApiProperty({
+//         description: 'Department',
+//         example: 'Operations',
+//     })
+//     @IsString()
+//     @MinLength(2)
+//     @MaxLength(100)
+//     department: string;
+
+//     @ApiProperty({
+//         description: 'Job position',
+//         example: 'Security Officer',
+//     })
+//     @IsString()
+//     @MinLength(2)
+//     @MaxLength(100)
+//     position: string;
+
+//     @ApiPropertyOptional({
+//         description: 'RFID card identifier',
+//         example: 'RFID-12345',
+//     })
+//     @IsOptional()
+//     @IsString()
+//     rfidCardId?: string;
+
+//     @ApiPropertyOptional({
+//         description: '4-6 digit PIN code',
+//         example: '1234',
+//     })
+//     @IsOptional()
+//     @IsString()
+//     @MinLength(4)
+//     @MaxLength(6)
+//     @Matches(/^\d+$/, { message: 'PIN must contain only numbers' })
+//     pinCode?: string;
+
+//     @ApiProperty({
+//         description: 'Assigned shift ID',
+//         example: '123e4567-e89b-12d3-a456-426614174000',
+//     })
+//     @IsUUID()
+//     shiftId: string;
+
+//     @ApiPropertyOptional({
+//         description: 'Employment status',
+//         enum: EmploymentStatus,
+//         default: EmploymentStatus.ACTIVE,
+//     })
+//     @IsOptional()
+//     @IsEnum(EmploymentStatus)
+//     status?: EmploymentStatus;
+
+//     @ApiPropertyOptional({
+//         description: 'Additional notes',
+//     })
+//     @IsOptional()
+//     @IsString()
+//     @MaxLength(1000)
+//     notes?: string;
+// }
+
+
+
+
 export class CreateEmployeeDto {
-    @ApiProperty({
-        description: 'Employee ID number',
-        example: 'EMP-001',
-    })
+    @ApiProperty({ description: 'Employee ID', example: 'EMP-001' })
     @IsString()
-    @MinLength(3)
-    @MaxLength(50)
     employeeId: string;
 
-    @ApiProperty({
-        description: 'First name',
-        example: 'John',
-    })
+    @ApiProperty({ description: 'First name' })
     @IsString()
-    @MinLength(2)
-    @MaxLength(100)
     firstName: string;
 
-    @ApiProperty({
-        description: 'Last name',
-        example: 'Doe',
-    })
+    @ApiProperty({ description: 'Last name' })
     @IsString()
-    @MinLength(2)
-    @MaxLength(100)
     lastName: string;
 
-    @ApiPropertyOptional({
-        description: 'Email address',
-        example: 'john.doe@military.com',
-    })
+    @ApiPropertyOptional({ description: 'Email address' })
     @IsOptional()
     @IsEmail()
     email?: string;
 
-    @ApiPropertyOptional({
-        description: 'Phone number',
-        example: '+1234567890',
-    })
+    @ApiPropertyOptional({ description: 'Phone number' })
     @IsOptional()
     @IsString()
-    @Matches(/^\+?[1-9]\d{1,14}$/, {
-        message: 'Phone number must be in valid international format',
-    })
     phone?: string;
 
-    @ApiProperty({
-        description: 'Department',
-        example: 'Operations',
-    })
+    @ApiProperty({ description: 'Department name' })
     @IsString()
-    @MinLength(2)
-    @MaxLength(100)
     department: string;
 
-    @ApiProperty({
-        description: 'Job position',
-        example: 'Security Officer',
-    })
+    @ApiPropertyOptional({ description: 'Department ID (UUID)' })
+    @IsOptional()
+    @IsUUID()
+    departmentId?: string;
+
+    @IsOptional()
+    @IsEnum(EmploymentStatus)
+    status?: EmploymentStatus
+
+    @ApiProperty({ description: 'Position/Job title' })
     @IsString()
-    @MinLength(2)
-    @MaxLength(100)
     position: string;
 
-    @ApiPropertyOptional({
-        description: 'RFID card identifier',
-        example: 'RFID-12345',
-    })
+    @ApiPropertyOptional({ description: 'RFID card ID' })
     @IsOptional()
     @IsString()
     rfidCardId?: string;
 
-    @ApiPropertyOptional({
-        description: '4-6 digit PIN code',
-        example: '1234',
-    })
+    @ApiPropertyOptional({ description: 'PIN code' })
     @IsOptional()
     @IsString()
-    @MinLength(4)
-    @MaxLength(6)
-    @Matches(/^\d+$/, { message: 'PIN must contain only numbers' })
     pinCode?: string;
 
-    @ApiProperty({
-        description: 'Assigned shift ID',
-        example: '123e4567-e89b-12d3-a456-426614174000',
-    })
+    @ApiProperty({ description: 'Shift ID' })
     @IsUUID()
     shiftId: string;
-
-    @ApiPropertyOptional({
-        description: 'Employment status',
-        enum: EmploymentStatus,
-        default: EmploymentStatus.ACTIVE,
-    })
-    @IsOptional()
-    @IsEnum(EmploymentStatus)
-    status?: EmploymentStatus;
-
-    @ApiPropertyOptional({
-        description: 'Additional notes',
-    })
-    @IsOptional()
-    @IsString()
-    @MaxLength(1000)
-    notes?: string;
 }
-
 export class UpdateEmployeeDto {
     @ApiPropertyOptional({
         description: 'First name',
@@ -165,6 +224,12 @@ export class UpdateEmployeeDto {
     @IsOptional()
     @IsString()
     department?: string;
+
+    @ApiPropertyOptional({ description: 'Department ID (UUID)' })
+    @IsOptional()
+    @IsUUID()
+    departmentId?: string;
+
 
     @ApiPropertyOptional({
         description: 'Job position',

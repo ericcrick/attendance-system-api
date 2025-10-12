@@ -37,6 +37,8 @@ async function bootstrap() {
     .addTag('attendance', 'Attendance tracking')
     .addTag('shifts', 'Shift management')
     .addTag('reports', 'Reports and analytics')
+    .addTag('departments', 'Departments managements')
+    .addTag('leaves', 'Leaves managements')
     .addBearerAuth(
       {
         type: 'http',

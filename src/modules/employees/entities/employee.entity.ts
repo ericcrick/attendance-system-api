@@ -1,3 +1,6 @@
+// src/modules/employees/entities/employee.entity.ts
+
+
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -12,6 +15,8 @@ import { ApiProperty } from '@nestjs/swagger';
 import { EmploymentStatus } from '../../../common/enums';
 import { Shift } from '../../shifts/entities/shift.entity';
 import { Attendance } from '../../attendance/entities/attendance.entity';
+import { Department } from '../../departments/entities/department.entity';
+import { Leave } from '../../leaves/entities/leave.entity';
 
 @Entity('employees')
 export class Employee {
@@ -39,9 +44,21 @@ export class Employee {
   @Column({ nullable: true })
   phone?: string;
 
-  @ApiProperty({ description: 'Department', example: 'Operations' })
+  @ApiProperty({ description: 'Department name (legacy field)', example: 'Operations' })
   @Column()
   department: string;
+
+  @ApiProperty({ description: 'Department ID (new field)', required: false })
+  @Column({ nullable: true, name: 'department_id' })
+  departmentId?: string;
+
+  @ApiProperty({ description: 'Department details', type: () => Department, required: false })
+  @ManyToOne(() => Department, { nullable: true, eager: false })
+  @JoinColumn({ name: 'department_id' })
+  departmentRelation?: Department;
+  @ApiProperty({ description: 'Leave records', type: () => [Leave] })
+  @OneToMany(() => Leave, (leave) => leave.employee)
+  leaves: Leave[];
 
   @ApiProperty({ description: 'Job position', example: 'Security Officer' })
   @Column()

@@ -4,9 +4,10 @@ import { EmployeesService } from './employees.service';
 import { EmployeesController } from './employees.controller';
 import { Employee } from './entities/employee.entity';
 import { ShiftsModule } from '../shifts/shifts.module';
+import { DepartmentsModule } from '../departments/departments.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Employee]), ShiftsModule],
+  imports: [TypeOrmModule.forFeature([Employee]), ShiftsModule,DepartmentsModule],
   controllers: [EmployeesController],
   providers: [EmployeesService],
   exports: [EmployeesService],
