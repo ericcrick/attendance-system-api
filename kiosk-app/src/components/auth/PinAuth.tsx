@@ -61,10 +61,11 @@ export default function PinAuth({ onSuccess }: PinAuthProps) {
       setVerifiedEmployeeId(employeeId);
       setPin('');
     } catch (err: any) {
-      console.error('Verification error:', err);
-      setError(err.message || 'Invalid employee ID or PIN');
+      const errorMessage = err.message || 'Invalid employee ID or PIN';
+      setError(errorMessage);
       setPin('');
-      
+
+      // Clear error after 5 seconds
       setTimeout(() => {
         setError(null);
       }, 5000);
@@ -91,45 +92,34 @@ export default function PinAuth({ onSuccess }: PinAuthProps) {
         location: process.env.NEXT_PUBLIC_KIOSK_ID,
       };
 
-      console.log(`Attempting ${actionType}:`, data);
-
       const response =
         actionType === 'clock-in'
           ? await attendanceApi.clockIn(data)
           : await attendanceApi.clockOut(data);
 
-      console.log(`${actionType} success:`, response);
-
+      // Success - call onSuccess callback
       onSuccess({
         action: actionType,
         employee: verifiedEmployee,
         attendance: response,
       });
 
+      // Reset state after successful action
       setTimeout(() => {
-        setVerifiedEmployee(null);
-        setVerifiedPin('');
-        setVerifiedEmployeeId('');
-        setEmployeeId('');
-        setPin('');
-        setStep('employee-id');
-        setAction(null);
-        setError(null);
+        handleReset();
       }, 100);
     } catch (err: any) {
-      console.error(`${actionType} error:`, err);
+
+
+      // Extract error message from API response
       const errorMessage = err.message || `Failed to ${actionType.replace('-', ' ')}`;
       setError(errorMessage);
-      
-      setTimeout(() => {
-        setError(null);
-        setVerifiedEmployee(null);
-        setVerifiedPin('');
-        setVerifiedEmployeeId('');
-        setAction(null);
-      }, 8000);
+
+      // Don't reset verified employee state - let user see the error and try again or cancel
+      // Error will stay visible until user clicks "Cancel / Start Over" or tries another action
     } finally {
       setLoading(false);
+      setAction(null);
     }
   };
 
@@ -146,18 +136,19 @@ export default function PinAuth({ onSuccess }: PinAuthProps) {
 
   const ErrorDisplay = () => {
     if (!error) return null;
-    
+
     return (
-      <div className="max-w-md mx-auto mb-4 p-3 bg-red-50 border border-red-200 rounded shadow-sm">
+      <div className="max-w-md mx-auto mb-4 p-3 bg-red-50 border border-red-200 rounded shadow-sm animate-in fade-in duration-200">
         <div className="flex items-start space-x-2">
           <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="font-semibold text-red-900 text-sm mb-0.5">Action Failed</p>
-            <p className="text-red-700 text-xs">{error}</p>
+            <p className="text-red-700 text-xs leading-relaxed">{error}</p>
           </div>
-          <button 
+          <button
             onClick={() => setError(null)}
             className="text-red-400 hover:text-red-600 transition-colors"
+            aria-label="Dismiss error"
           >
             <XCircle className="w-4 h-4" />
           </button>
@@ -166,11 +157,11 @@ export default function PinAuth({ onSuccess }: PinAuthProps) {
     );
   };
 
-  if (verifiedEmployee && !loading) {
+  if (verifiedEmployee) {
     return (
       <div className="text-center">
         <ErrorDisplay />
-        
+
         <div className="mb-4">
           <div className="inline-flex items-center justify-center w-14 h-14 bg-green-50 rounded mb-3">
             <CheckCircle className="w-7 h-7 text-green-600" />
@@ -224,6 +215,14 @@ export default function PinAuth({ onSuccess }: PinAuthProps) {
         >
           Cancel / Start Over
         </button>
+
+        {error && (
+          <div className="mt-4 text-center">
+            <p className="text-xs text-gray-500">
+              Having issues? Click "Cancel / Start Over" to try again
+            </p>
+          </div>
+        )}
       </div>
     );
   }
@@ -257,10 +256,11 @@ export default function PinAuth({ onSuccess }: PinAuthProps) {
               placeholder="Employee ID (e.g., EMP-001)"
               className="w-full px-4 py-3 text-sm border border-gray-300 rounded focus:border-green-500 focus:ring-2 focus:ring-green-200 outline-none text-center transition-colors"
               autoFocus
+              disabled={loading}
             />
             <button
               onClick={handleEmployeeIdSubmit}
-              disabled={!employeeId.trim()}
+              disabled={!employeeId.trim() || loading}
               className="w-full mt-3 px-4 py-3 bg-green-600 text-white text-sm rounded font-medium hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
             >
               Continue
@@ -272,11 +272,10 @@ export default function PinAuth({ onSuccess }: PinAuthProps) {
               {[...Array(6)].map((_, i) => (
                 <div
                   key={i}
-                  className={`w-10 h-10 rounded border flex items-center justify-center text-lg font-bold transition-all ${
-                    i < pin.length
+                  className={`w-10 h-10 rounded border flex items-center justify-center text-lg font-bold transition-all ${i < pin.length
                       ? 'border-green-500 bg-green-50 text-green-700'
                       : 'border-gray-300 bg-gray-50 text-gray-400'
-                  }`}
+                    }`}
                 >
                   {i < pin.length ? '•' : ''}
                 </div>
@@ -296,7 +295,8 @@ export default function PinAuth({ onSuccess }: PinAuthProps) {
               ))}
               <button
                 onClick={handleReset}
-                className="h-12 bg-gray-100 hover:bg-gray-200 rounded text-xs font-medium transition-colors"
+                disabled={loading}
+                className="h-12 bg-gray-100 hover:bg-gray-200 rounded text-xs font-medium transition-colors disabled:opacity-50"
               >
                 Clear
               </button>
