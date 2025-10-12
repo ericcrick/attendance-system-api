@@ -60,101 +60,101 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-4 max-w-4xl">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">Settings</h2>
-        <p className="text-gray-600 mt-1">
+        <h2 className="text-lg font-semibold text-slate-900">Settings</h2>
+        <p className="text-sm text-slate-600 mt-0.5">
           Manage your account settings and preferences
         </p>
       </div>
 
       {/* Profile Information */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="p-6 border-b border-gray-200 flex items-center space-x-3">
-          <div className="bg-blue-100 p-2 rounded-lg">
-            <User className="w-5 h-5 text-blue-600" />
+      <div className="bg-white rounded shadow-sm border border-slate-200">
+        <div className="p-4 border-b border-slate-200 flex items-center space-x-2">
+          <div className="bg-blue-50 p-1.5 rounded">
+            <User className="w-4 h-4 text-blue-600" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">
+            <h3 className="text-sm font-semibold text-slate-900">
               Profile Information
             </h3>
-            <p className="text-sm text-gray-600">
+            <p className="text-xs text-slate-600">
               Your account details
             </p>
           </div>
         </div>
 
-        <div className="p-6 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="p-4 space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs font-medium text-slate-700 mb-1">
                 Username
               </label>
               <input
                 type="text"
                 value={user?.username || ''}
                 disabled
-                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-600"
+                className="w-full px-3 py-2 text-sm border border-slate-300 rounded bg-slate-50 text-slate-600"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs font-medium text-slate-700 mb-1">
                 Email
               </label>
               <input
                 type="email"
                 value={user?.email || ''}
                 disabled
-                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-600"
+                className="w-full px-3 py-2 text-sm border border-slate-300 rounded bg-slate-50 text-slate-600"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs font-medium text-slate-700 mb-1">
                 First Name
               </label>
               <input
                 type="text"
                 value={user?.firstName || ''}
                 disabled
-                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-600"
+                className="w-full px-3 py-2 text-sm border border-slate-300 rounded bg-slate-50 text-slate-600"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs font-medium text-slate-700 mb-1">
                 Last Name
               </label>
               <input
                 type="text"
                 value={user?.lastName || ''}
                 disabled
-                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-600"
+                className="w-full px-3 py-2 text-sm border border-slate-300 rounded bg-slate-50 text-slate-600"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs font-medium text-slate-700 mb-1">
                 Role
               </label>
               <input
                 type="text"
                 value={user?.role || ''}
                 disabled
-                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-600"
+                className="w-full px-3 py-2 text-sm border border-slate-300 rounded bg-slate-50 text-slate-600"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs font-medium text-slate-700 mb-1">
                 Status
               </label>
               <span
-                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                   user?.isActive
-                    ? 'bg-green-100 text-green-800'
-                    : 'bg-red-100 text-red-800'
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-rose-100 text-rose-700'
                 }`}
               >
                 {user?.isActive ? 'Active' : 'Inactive'}
@@ -165,37 +165,37 @@ export default function SettingsPage() {
       </div>
 
       {/* Change Password */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="p-6 border-b border-gray-200 flex items-center space-x-3">
-          <div className="bg-purple-100 p-2 rounded-lg">
-            <Lock className="w-5 h-5 text-purple-600" />
+      <div className="bg-white rounded shadow-sm border border-slate-200">
+        <div className="p-4 border-b border-slate-200 flex items-center space-x-2">
+          <div className="bg-blue-50 p-1.5 rounded">
+            <Lock className="w-4 h-4 text-blue-600" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">
+            <h3 className="text-sm font-semibold text-slate-900">
               Change Password
             </h3>
-            <p className="text-sm text-gray-600">
+            <p className="text-xs text-slate-600">
               Update your password to keep your account secure
             </p>
           </div>
         </div>
 
-        <form onSubmit={handlePasswordChange} className="p-6 space-y-4">
+        <form onSubmit={handlePasswordChange} className="p-4 space-y-3">
           {error && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded text-rose-800 text-xs">
               {error}
             </div>
           )}
 
           {success && (
-            <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm flex items-center space-x-2">
-              <CheckCircle className="w-5 h-5" />
+            <div className="p-3 bg-green-50 border border-green-200 rounded text-green-800 text-xs flex items-center space-x-1.5">
+              <CheckCircle className="w-4 h-4" />
               <span>{success}</span>
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-xs font-medium text-slate-700 mb-1">
               Current Password *
             </label>
             <input
@@ -204,12 +204,12 @@ export default function SettingsPage() {
               value={passwordData.currentPassword}
               onChange={handlePasswordInputChange}
               required
-              className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none"
+              className="w-full px-3 py-2 text-sm border border-slate-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-xs font-medium text-slate-700 mb-1">
               New Password *
             </label>
             <input
@@ -219,15 +219,15 @@ export default function SettingsPage() {
               onChange={handlePasswordInputChange}
               required
               minLength={6}
-              className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none"
+              className="w-full px-3 py-2 text-sm border border-slate-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-slate-500 mt-0.5">
               Must be at least 6 characters long
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-xs font-medium text-slate-700 mb-1">
               Confirm New Password *
             </label>
             <input
@@ -237,19 +237,19 @@ export default function SettingsPage() {
               onChange={handlePasswordInputChange}
               required
               minLength={6}
-              className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none"
+              className="w-full px-3 py-2 text-sm border border-slate-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
             />
           </div>
 
-          <div className="flex justify-end pt-4 border-t border-gray-200">
+          <div className="flex justify-end pt-3 border-t border-slate-200">
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
+              className="px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors flex items-center space-x-1.5"
             >
               {loading ? (
                 <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                   <span>Updating...</span>
                 </>
               ) : (
@@ -261,34 +261,34 @@ export default function SettingsPage() {
       </div>
 
       {/* System Information */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+      <div className="bg-white rounded shadow-sm border border-slate-200 p-4">
+        <h3 className="text-sm font-semibold text-slate-900 mb-3">
           System Information
         </h3>
-        <div className="space-y-3 text-sm">
-          <div className="flex items-center justify-between py-2 border-b border-gray-100">
-            <span className="text-gray-600">Version:</span>
-            <span className="font-medium text-gray-900">1.0.0</span>
+        <div className="space-y-2 text-xs">
+          <div className="flex items-center justify-between py-1.5 border-b border-slate-100">
+            <span className="text-slate-600">Version:</span>
+            <span className="font-medium text-slate-900">1.0.0</span>
           </div>
-          <div className="flex items-center justify-between py-2 border-b border-gray-100">
-            <span className="text-gray-600">Last Login:</span>
-            <span className="font-medium text-gray-900">
+          <div className="flex items-center justify-between py-1.5 border-b border-slate-100">
+            <span className="text-slate-600">Last Login:</span>
+            <span className="font-medium text-slate-900">
               {user?.lastLogin
                 ? new Date(user.lastLogin).toLocaleString()
                 : 'N/A'}
             </span>
           </div>
-          <div className="flex items-center justify-between py-2 border-b border-gray-100">
-            <span className="text-gray-600">Account Created:</span>
-            <span className="font-medium text-gray-900">
+          <div className="flex items-center justify-between py-1.5 border-b border-slate-100">
+            <span className="text-slate-600">Account Created:</span>
+            <span className="font-medium text-slate-900">
               {user?.createdAt
                 ? new Date(user.createdAt).toLocaleDateString()
                 : 'N/A'}
             </span>
           </div>
-          <div className="flex items-center justify-between py-2">
-            <span className="text-gray-600">API Status:</span>
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+          <div className="flex items-center justify-between py-1.5">
+            <span className="text-slate-600">API Status:</span>
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
               Connected
             </span>
           </div>

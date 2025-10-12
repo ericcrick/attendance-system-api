@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Users, Clock, UserCheck, AlertCircle, Calendar, TrendingUp } from 'lucide-react';
+import { Users, Clock, UserCheck, Calendar, TrendingUp } from 'lucide-react';
 import { employeesApi, attendanceApi, shiftsApi } from '@/lib/api-client';
 import { Employee, Attendance } from '@/types';
+import Link from 'next/link';
 
 interface DashboardStats {
   totalEmployees: number;
@@ -71,8 +72,8 @@ export default function DashboardPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading dashboard...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-3 text-sm text-slate-600">Loading dashboard...</p>
         </div>
       </div>
     );
@@ -84,8 +85,7 @@ export default function DashboardPage() {
       value: stats.totalEmployees,
       subtitle: `${stats.activeEmployees} active`,
       icon: Users,
-      color: 'blue',
-      bgColor: 'bg-blue-100',
+      bgColor: 'bg-blue-50',
       textColor: 'text-blue-600',
     },
     {
@@ -93,8 +93,7 @@ export default function DashboardPage() {
       value: stats.currentlyPresent,
       subtitle: 'Clocked in today',
       icon: UserCheck,
-      color: 'green',
-      bgColor: 'bg-green-100',
+      bgColor: 'bg-green-50',
       textColor: 'text-green-600',
     },
     {
@@ -102,8 +101,7 @@ export default function DashboardPage() {
       value: stats.todayOnTime,
       subtitle: `${stats.todayLate} late arrivals`,
       icon: Clock,
-      color: 'emerald',
-      bgColor: 'bg-emerald-100',
+      bgColor: 'bg-emerald-50',
       textColor: 'text-emerald-600',
     },
     {
@@ -111,83 +109,81 @@ export default function DashboardPage() {
       value: stats.totalShifts,
       subtitle: 'Active schedules',
       icon: Calendar,
-      color: 'purple',
-      bgColor: 'bg-purple-100',
-      textColor: 'text-purple-600',
+      bgColor: 'bg-slate-100',
+      textColor: 'text-slate-700',
     },
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Welcome Section */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl shadow-lg p-8 text-white">
-        <h2 className="text-3xl font-bold mb-2">Welcome to Dashboard</h2>
-        <p className="text-blue-100">
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded shadow-sm p-6 text-white">
+        <h2 className="text-xl font-semibold mb-1">Welcome to Dashboard</h2>
+        <p className="text-sm text-blue-100">
           Here's an overview of your attendance system today
         </p>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map((stat) => {
           const Icon = stat.icon;
           return (
             <div
               key={stat.title}
-              className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
+              className="bg-white rounded shadow-sm border border-slate-200 p-4 hover:shadow transition-shadow"
             >
-              <div className="flex items-center justify-between mb-4">
-                <div className={`${stat.bgColor} p-3 rounded-lg`}>
-                  <Icon className={`w-6 h-6 ${stat.textColor}`} />
+              <div className="flex items-center justify-between mb-3">
+                <div className={`${stat.bgColor} p-2 rounded`}>
+                  <Icon className={`w-4 h-4 ${stat.textColor}`} />
                 </div>
               </div>
-              <h3 className="text-gray-600 text-sm font-medium mb-1">
+              <h3 className="text-slate-600 text-xs font-medium mb-1">
                 {stat.title}
               </h3>
-              <div className="flex items-baseline space-x-2">
-                <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
+              <div className="flex items-baseline space-x-1.5">
+                <p className="text-2xl font-semibold text-slate-900">{stat.value}</p>
               </div>
-              <p className="text-sm text-gray-500 mt-1">{stat.subtitle}</p>
+              <p className="text-xs text-slate-500 mt-0.5">{stat.subtitle}</p>
             </div>
           );
         })}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Recent Attendance */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-          <div className="p-6 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
-              <Clock className="w-5 h-5 text-blue-600" />
+        <div className="bg-white rounded shadow-sm border border-slate-200">
+          <div className="p-4 border-b border-slate-200">
+            <h3 className="text-sm font-semibold text-slate-900 flex items-center space-x-2">
+              <Clock className="w-4 h-4 text-blue-600" />
               <span>Recent Attendance</span>
             </h3>
           </div>
-          <div className="p-6">
+          <div className="p-4">
             {recentAttendance.length > 0 ? (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {recentAttendance.map((attendance) => (
                   <div
                     key={attendance.id}
-                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                    className="flex items-center justify-between p-3 bg-slate-50 rounded"
                   >
                     <div className="flex-1">
-                      <p className="font-medium text-gray-900">
+                      <p className="text-sm font-medium text-slate-900">
                         {attendance.employee.fullName}
                       </p>
-                      <p className="text-sm text-gray-500">
+                      <p className="text-xs text-slate-500">
                         {attendance.employee.department}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-medium text-gray-900">
+                      <p className="text-xs font-medium text-slate-900">
                         {formatTime(attendance.clockInTime)}
                       </p>
                       <span
-                        className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
-                          attendance.status === 'ON_TIME'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}
+                        className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${attendance.status === 'ON_TIME'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-rose-100 text-rose-700'
+                          }`}
                       >
                         {attendance.status === 'ON_TIME' ? 'On Time' : 'Late'}
                       </span>
@@ -196,49 +192,48 @@ export default function DashboardPage() {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-500">
-                <Clock className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                <p>No attendance records today</p>
+              <div className="text-center py-8 text-slate-500">
+                <Clock className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                <p className="text-sm">No attendance records today</p>
               </div>
             )}
           </div>
         </div>
 
         {/* Quick Stats */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-          <div className="p-6 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
-              <TrendingUp className="w-5 h-5 text-blue-600" />
+        <div className="bg-white rounded shadow-sm border border-slate-200">
+          <div className="p-4 border-b border-slate-200">
+            <h3 className="text-sm font-semibold text-slate-900 flex items-center space-x-2">
+              <TrendingUp className="w-4 h-4 text-blue-600" />
               <span>Today's Summary</span>
             </h3>
           </div>
-          <div className="p-6">
-            <div className="space-y-6">
+          <div className="p-4">
+            <div className="space-y-4">
               {/* Attendance Rate */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-600">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-medium text-slate-600">
                     Attendance Rate
                   </span>
-                  <span className="text-sm font-bold text-gray-900">
+                  <span className="text-xs font-semibold text-slate-900">
                     {stats.activeEmployees > 0
                       ? Math.round(
-                          (stats.currentlyPresent / stats.activeEmployees) * 100
-                        )
+                        (stats.currentlyPresent / stats.activeEmployees) * 100
+                      )
                       : 0}
                     %
                   </span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-slate-200 rounded-full h-1.5">
                   <div
-                    className="bg-blue-600 h-2 rounded-full transition-all"
+                    className="bg-blue-600 h-1.5 rounded-full transition-all"
                     style={{
-                      width: `${
-                        stats.activeEmployees > 0
-                          ? (stats.currentlyPresent / stats.activeEmployees) *
-                            100
-                          : 0
-                      }%`,
+                      width: `${stats.activeEmployees > 0
+                        ? (stats.currentlyPresent / stats.activeEmployees) *
+                        100
+                        : 0
+                        }%`,
                     }}
                   />
                 </div>
@@ -246,55 +241,55 @@ export default function DashboardPage() {
 
               {/* On-Time Rate */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-600">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-medium text-slate-600">
                     On-Time Rate
                   </span>
-                  <span className="text-sm font-bold text-gray-900">
+                  <span className="text-xs font-semibold text-slate-900">
                     {stats.todayOnTime + stats.todayLate > 0
                       ? Math.round(
-                          (stats.todayOnTime /
-                            (stats.todayOnTime + stats.todayLate)) *
-                            100
-                        )
+                        (stats.todayOnTime /
+                          (stats.todayOnTime + stats.todayLate)) *
+                        100
+                      )
                       : 0}
                     %
                   </span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-slate-200 rounded-full h-1.5">
                   <div
-                    className="bg-green-600 h-2 rounded-full transition-all"
+                    className="bg-green-600 h-1.5 rounded-full transition-all"
                     style={{
-                      width: `${
-                        stats.todayOnTime + stats.todayLate > 0
-                          ? (stats.todayOnTime /
-                              (stats.todayOnTime + stats.todayLate)) *
-                            100
-                          : 0
-                      }%`,
+                      width: `${stats.todayOnTime + stats.todayLate > 0
+                        ? (stats.todayOnTime /
+                          (stats.todayOnTime + stats.todayLate)) *
+                        100
+                        : 0
+                        }%`,
                     }}
                   />
                 </div>
               </div>
 
-              {/* Department Breakdown - Placeholder */}
-              <div className="pt-4 border-t border-gray-200">
-                <h4 className="text-sm font-medium text-gray-900 mb-3">
+              {/* Quick Actions */}
+              <div className="pt-3 border-t border-slate-200">
+                <h4 className="text-xs font-medium text-slate-900 mb-2">
                   Quick Actions
                 </h4>
-                <div className="grid grid-cols-2 gap-3">
-                  <a
+                <div className="grid grid-cols-2 gap-2">
+                  <Link
                     href="/dashboard/employees"
-                    className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors text-center"
+                    className="px-3 py-2 bg-blue-50 text-blue-600 rounded text-xs font-medium hover:bg-blue-100 transition-colors text-center"
                   >
                     View Employees
-                  </a>
-                  <a
+                  </Link>
+
+                  <Link
                     href="/dashboard/attendance"
-                    className="px-4 py-2 bg-green-50 text-green-600 rounded-lg text-sm font-medium hover:bg-green-100 transition-colors text-center"
+                    className="px-3 py-2 bg-green-50 text-green-600 rounded text-xs font-medium hover:bg-green-100 transition-colors text-center"
                   >
                     View Reports
-                  </a>
+                  </Link>
                 </div>
               </div>
             </div>
