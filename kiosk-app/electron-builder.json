@@ -1,0 +1,53 @@
+{
+  "appId": "com.military.attendance.kiosk",
+  "productName": "Attendance Kiosk",
+  "directories": {
+    "output": "dist",
+    "buildResources": "build"
+  },
+  "files": [
+    "out/**/*",
+    "electron/**/*",
+    "package.json",
+    "!node_modules/**/*",
+    "!src/**/*",
+    "!.next/**/*",
+    "!**/*.map"
+  ],
+  "asarUnpack": [
+    "out/**/*"
+  ],
+  "extraResources": [
+    {
+      "from": "public/models",
+      "to": "models",
+      "filter": ["**/*"]
+    }
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "public/icon.ico",
+    "signAndEditExecutable": false,
+    "verifyUpdateCodeSignature": false
+  },
+  "mac": {
+    "target": ["dmg"],
+    "icon": "public/icon.icns",
+    "category": "public.app-category.business"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true
+  },
+  "npmRebuild": false,
+  "buildDependenciesFromSource": false,
+  "nodeGypRebuild": false,
+  "forceCodeSigning": false
+}

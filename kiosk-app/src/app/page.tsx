@@ -8,7 +8,7 @@ import ClockInOutScreen from '@/components/ClockInOutScreen';
 import CurrentTime from '@/components/CurrentTime';
 
 export default function Home() {
-  const [isOnline, setIsOnline] = useState(true);
+  const [isOnline, _setIsOnline] = useState(true);
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
