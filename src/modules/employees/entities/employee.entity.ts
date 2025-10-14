@@ -17,6 +17,7 @@ import { Shift } from '../../shifts/entities/shift.entity';
 import { Attendance } from '../../attendance/entities/attendance.entity';
 import { Department } from '../../departments/entities/department.entity';
 import { Leave } from '../../leaves/entities/leave.entity';
+import { Expose } from 'class-transformer';
 
 @Entity('employees')
 export class Employee {
@@ -117,7 +118,7 @@ export class Employee {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 
-  // Virtual field for full name
+  @Expose()
   get fullName(): string {
     return `${this.firstName} ${this.lastName}`;
   }

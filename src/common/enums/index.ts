@@ -9,6 +9,9 @@ export enum AttendanceStatus {
     LATE = 'LATE',
     EARLY_DEPARTURE = 'EARLY_DEPARTURE',
     ABSENT = 'ABSENT',
+    OVERTIME = 'OVERTIME',
+    INCOMPLETE = 'INCOMPLETE', // Didn't clock out
+    COMPLETED = 'COMPLETED', // Completed shift
 }
 
 export enum UserRole {

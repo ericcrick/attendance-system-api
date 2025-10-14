@@ -11,6 +11,7 @@ import { ClockInDto, ClockOutDto, VerifyEmployeeDto } from './dto/attendance.dto
 import { EmployeesService } from '../employees/employees.service';
 import { AuthMethod, AttendanceStatus } from '../../common/enums';
 import { Employee } from '../employees/entities/employee.entity';
+import { LeavesService } from '../leaves/leaves.service';
 
 @Injectable()
 export class AttendanceService {
@@ -18,6 +19,7 @@ export class AttendanceService {
         @InjectRepository(Attendance)
         private readonly attendanceRepository: Repository<Attendance>,
         private readonly employeesService: EmployeesService,
+        private readonly leavesService: LeavesService,
     ) { }
 
     async verifyEmployee(verifyDto: VerifyEmployeeDto): Promise<any> {
@@ -83,6 +85,137 @@ export class AttendanceService {
         };
     }
 
+    // async clockIn(clockInDto: ClockInDto): Promise<Attendance> {
+    //     const verifyDto: VerifyEmployeeDto = {
+    //         method: clockInDto.method,
+    //         rfidCardId: clockInDto.rfidCardId,
+    //         employeeId: clockInDto.employeeId,
+    //         pinCode: clockInDto.pinCode,
+    //         faceEncoding: clockInDto.faceEncoding,
+    //     };
+
+    //     const { employee } = await this.verifyEmployee(verifyDto);
+
+    //     const today = new Date();
+    //     today.setHours(0, 0, 0, 0);
+    //     const tomorrow = new Date(today);
+    //     tomorrow.setDate(tomorrow.getDate() + 1);
+
+    //     // Check if employee has any attendance record for today
+    //     const todayAttendance = await this.attendanceRepository.findOne({
+    //         where: {
+    //             employeeId: employee.id,
+    //             clockInTime: Between(today, tomorrow),
+    //         },
+    //         order: {
+    //             clockInTime: 'DESC',
+    //         },
+    //     });
+
+    //     if (todayAttendance) {
+    //         // If they haven't clocked out yet
+    //         if (!todayAttendance.clockOutTime) {
+    //             throw new BadRequestException(
+    //                 'You have already clocked in today and have not clocked out yet. Please clock out before clocking in again.',
+    //             );
+    //         }
+    //         // If they have already completed a full cycle (clocked in and out)
+    //         else {
+    //             throw new BadRequestException(
+    //                 'You have already completed your attendance for today. You clocked in and out successfully.',
+    //             );
+    //         }
+    //     }
+
+    //     const fullEmployee = await this.employeesService.findOne(employee.id);
+
+    //     const clockInTime = new Date();
+    //     const status = fullEmployee.shift.isLateArrival(clockInTime)
+    //         ? AttendanceStatus.LATE
+    //         : AttendanceStatus.ON_TIME;
+
+    //     const attendance = this.attendanceRepository.create({
+    //         employeeId: employee.id,
+    //         clockInTime,
+    //         clockInMethod: clockInDto.method,
+    //         clockInPhoto: clockInDto.photoUrl,
+    //         clockInLocation: clockInDto.location,
+    //         status,
+    //     });
+
+    //     return this.attendanceRepository.save(attendance);
+    // }
+
+    // async clockOut(clockOutDto: ClockOutDto): Promise<Attendance> {
+    //     const verifyDto: VerifyEmployeeDto = {
+    //         method: clockOutDto.method,
+    //         rfidCardId: clockOutDto.rfidCardId,
+    //         employeeId: clockOutDto.employeeId,
+    //         pinCode: clockOutDto.pinCode,
+    //         faceEncoding: clockOutDto.faceEncoding,
+    //     };
+
+    //     const { employee } = await this.verifyEmployee(verifyDto);
+
+    //     const today = new Date();
+    //     today.setHours(0, 0, 0, 0);
+    //     const tomorrow = new Date(today);
+    //     tomorrow.setDate(tomorrow.getDate() + 1);
+
+    //     // First, check if there's an already completed attendance (clocked in and out)
+    //     const completedAttendance = await this.attendanceRepository.findOne({
+    //         where: {
+    //             employeeId: employee.id,
+    //             clockInTime: Between(today, tomorrow),
+    //         },
+    //         order: {
+    //             clockInTime: 'DESC',
+    //         },
+    //     });
+
+    //     if (completedAttendance && completedAttendance.clockOutTime) {
+    //         const clockOutTimeFormatted = completedAttendance.clockOutTime.toLocaleTimeString('en-US', {
+    //             hour: '2-digit',
+    //             minute: '2-digit',
+    //             hour12: true,
+    //         });
+    //         throw new BadRequestException(
+    //             `You have already clocked out today at ${clockOutTimeFormatted}. You cannot clock out again.`,
+    //         );
+    //     }
+
+    //     // Find active clock-in record (not clocked out yet)
+    //     const attendance = await this.attendanceRepository.findOne({
+    //         where: {
+    //             employeeId: employee.id,
+    //             clockInTime: Between(today, tomorrow),
+    //             clockOutTime: null as any,
+    //         },
+    //     });
+
+    //     if (!attendance) {
+    //         throw new BadRequestException(
+    //             'No active clock-in record found for today. Please clock in first before clocking out.',
+    //         );
+    //     }
+
+    //     // Update attendance record
+    //     attendance.clockOutTime = new Date();
+    //     attendance.clockOutMethod = clockOutDto.method;
+    //     attendance.clockOutPhoto = clockOutDto.photoUrl;
+    //     attendance.clockOutLocation = clockOutDto.location;
+    //     attendance.notes = clockOutDto.notes;
+
+    //     // Calculate work duration
+    //     attendance.calculateWorkDuration();
+
+    //     return this.attendanceRepository.save(attendance);
+    // }
+
+
+
+
+
     async clockIn(clockInDto: ClockInDto): Promise<Attendance> {
         const verifyDto: VerifyEmployeeDto = {
             method: clockInDto.method,
@@ -94,7 +227,19 @@ export class AttendanceService {
 
         const { employee } = await this.verifyEmployee(verifyDto);
 
+        // Check if employee is on approved leave today
         const today = new Date();
+        const isOnLeave = await this.leavesService.isEmployeeOnLeave(
+            employee.id,
+            today,
+        );
+
+        if (isOnLeave) {
+            throw new BadRequestException(
+                'You cannot clock in today because you have an approved leave for this date. Please contact HR if this is incorrect.',
+            );
+        }
+
         today.setHours(0, 0, 0, 0);
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
@@ -111,14 +256,11 @@ export class AttendanceService {
         });
 
         if (todayAttendance) {
-            // If they haven't clocked out yet
             if (!todayAttendance.clockOutTime) {
                 throw new BadRequestException(
                     'You have already clocked in today and have not clocked out yet. Please clock out before clocking in again.',
                 );
-            }
-            // If they have already completed a full cycle (clocked in and out)
-            else {
+            } else {
                 throw new BadRequestException(
                     'You have already completed your attendance for today. You clocked in and out successfully.',
                 );
@@ -139,6 +281,8 @@ export class AttendanceService {
             clockInPhoto: clockInDto.photoUrl,
             clockInLocation: clockInDto.location,
             status,
+            shiftCompleted: false,
+            overtimeMinutes: 0,
         });
 
         return this.attendanceRepository.save(attendance);
@@ -155,12 +299,24 @@ export class AttendanceService {
 
         const { employee } = await this.verifyEmployee(verifyDto);
 
+        // Check if employee is on approved leave today
         const today = new Date();
+        const isOnLeave = await this.leavesService.isEmployeeOnLeave(
+            employee.id,
+            today,
+        );
+
+        if (isOnLeave) {
+            throw new BadRequestException(
+                'You cannot clock out today because you have an approved leave for this date. Please contact HR if this is incorrect.',
+            );
+        }
+
         today.setHours(0, 0, 0, 0);
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
 
-        // First, check if there's an already completed attendance (clocked in and out)
+        // Check for already completed attendance
         const completedAttendance = await this.attendanceRepository.findOne({
             where: {
                 employeeId: employee.id,
@@ -172,17 +328,18 @@ export class AttendanceService {
         });
 
         if (completedAttendance && completedAttendance.clockOutTime) {
-            const clockOutTimeFormatted = completedAttendance.clockOutTime.toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: true,
-            });
+            const clockOutTimeFormatted =
+                completedAttendance.clockOutTime.toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true,
+                });
             throw new BadRequestException(
                 `You have already clocked out today at ${clockOutTimeFormatted}. You cannot clock out again.`,
             );
         }
 
-        // Find active clock-in record (not clocked out yet)
+        // Find active clock-in record
         const attendance = await this.attendanceRepository.findOne({
             where: {
                 employeeId: employee.id,
@@ -204,7 +361,7 @@ export class AttendanceService {
         attendance.clockOutLocation = clockOutDto.location;
         attendance.notes = clockOutDto.notes;
 
-        // Calculate work duration
+        // Calculate work duration, overtime, and shift completion
         attendance.calculateWorkDuration();
 
         return this.attendanceRepository.save(attendance);

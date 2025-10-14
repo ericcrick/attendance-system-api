@@ -16,7 +16,7 @@ export class LeavesService {
     @InjectRepository(Leave)
     private readonly leavesRepository: Repository<Leave>,
     private readonly employeesService: EmployeesService,
-  ) {}
+  ) { }
 
   async create(createLeaveDto: CreateLeaveDto): Promise<Leave> {
     // Find employee by employeeId (not UUID)
@@ -152,5 +152,26 @@ export class LeavesService {
       approved: leaves.filter((l) => l.status === LeaveStatus.APPROVED).length,
       rejected: leaves.filter((l) => l.status === LeaveStatus.REJECTED).length,
     };
+  }
+
+
+  // src/modules/leaves/leaves.service.ts - Add this method
+
+  async isEmployeeOnLeave(employeeId: string, date: Date): Promise<boolean> {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const leave = await this.leavesRepository
+      .createQueryBuilder('leave')
+      .where('leave.employee_id = :employeeId', { employeeId })
+      .andWhere('leave.status = :status', { status: 'APPROVED' })
+      .andWhere('leave.start_date <= :date', { date: endOfDay })
+      .andWhere('leave.end_date >= :date', { date: startOfDay })
+      .getOne();
+
+    return !!leave;
   }
 }

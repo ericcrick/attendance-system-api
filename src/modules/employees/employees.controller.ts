@@ -31,7 +31,7 @@ import { Employee } from './entities/employee.entity';
 @ApiBearerAuth('JWT-auth')
 @Controller('employees')
 export class EmployeesController {
-  constructor(private readonly employeesService: EmployeesService) {}
+  constructor(private readonly employeesService: EmployeesService) { }
 
   @Post()
   @ApiOperation({ summary: 'Create a new employee' })
@@ -204,4 +204,4 @@ export class EmployeesController {
   remove(@Param('id') id: string): Promise<void> {
     return this.employeesService.remove(id);
   }
-}
+} 
