@@ -1,3 +1,4 @@
+// src/app/dashboard/attendance/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -12,11 +13,53 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  XCircle,
 } from 'lucide-react';
-import { attendanceApi, employeesApi } from '@/lib/api-client';
-import { Attendance } from '@/types';
+import { attendanceApi, departmentsApi, employeesApi } from '@/lib/api-client';
+import { Attendance, AttendanceStatus } from '@/types';
 
 const ITEMS_PER_PAGE = 10;
+
+// Toast component
+const Toast = ({
+  message,
+  type,
+  onClose
+}: {
+  message: string;
+  type: 'success' | 'error';
+  onClose: () => void;
+}) => (
+  <div className="fixed top-4 right-4 z-[100] animate-in slide-in-from-top-5 duration-300">
+    <div className={`flex items-center space-x-2 px-4 py-3 rounded shadow-lg ${type === 'success'
+      ? 'bg-green-600 text-white'
+      : 'bg-rose-600 text-white'
+      }`}>
+      {type === 'success' ? (
+        <CheckCircle className="w-5 h-5" />
+      ) : (
+        <XCircle className="w-5 h-5" />
+      )}
+      <span className="text-sm font-medium">{message}</span>
+      <button
+        onClick={onClose}
+        className="ml-4 text-white/80 hover:text-white"
+      >
+        <XCircle className="w-4 h-4" />
+      </button>
+    </div>
+  </div>
+);
+
+interface Statistics {
+  total: number;
+  onTime: number;
+  late: number;
+  completed: number;
+  incomplete: number;
+  overtime: number;
+  onTimePercentage: number;
+}
 
 export default function AttendancePage() {
   const [attendances, setAttendances] = useState<Attendance[]>([]);
@@ -29,10 +72,14 @@ export default function AttendancePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState<string>('all');
   const [departments, setDepartments] = useState<string[]>([]);
-  const [statistics, setStatistics] = useState({
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [statistics, setStatistics] = useState<Statistics>({
     total: 0,
     onTime: 0,
     late: 0,
+    completed: 0,
+    incomplete: 0,
+    overtime: 0,
     onTimePercentage: 0,
   });
 
@@ -50,25 +97,56 @@ export default function AttendancePage() {
     calculateStatistics();
   }, [filteredAttendances]);
 
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => {
+        setToast(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type });
+  };
+
+  // const fetchDepartments = async () => {
+  //   try {
+  //     const employees = await employeesApi.getAll();
+  //     const uniqueDepts = [...new Set(
+  //       (employees as any[])
+  //         .map((emp: any) => emp.department)
+  //         .filter(Boolean)
+  //     )];
+  //     setDepartments(uniqueDepts as string[]);
+  //   } catch (error) {
+  //     console.error('Failed to fetch departments:', error);
+  //   }
+  // };
+
   const fetchDepartments = async () => {
     try {
-      const employees: any = await employeesApi.getAll();
-      const uniqueDepts = [...new Set(employees.map((emp: any) => emp.department))];
-      setDepartments(uniqueDepts as any);
+      const data = await departmentsApi.getAll(); // Fetch from actual Department table
+      const activeDepts = (data as any[])
+        .filter((dept: any) => dept.isActive)
+        .map((dept: any) => dept.name);
+      setDepartments(activeDepts);
     } catch (error) {
       console.error('Failed to fetch departments:', error);
     }
   };
 
+
   const fetchTodayAttendance = async () => {
     setLoading(true);
     try {
-      const data: any = await attendanceApi.getToday();
-      setAttendances(data);
-      setFilteredAttendances(data);
+      const data = await attendanceApi.getToday();
+      setAttendances(data as Attendance[]);
+      setFilteredAttendances(data as Attendance[]);
       setViewMode('today');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch attendance:', error);
+      showToast(error.message || 'Failed to fetch attendance records', 'error');
     } finally {
       setLoading(false);
     }
@@ -76,22 +154,24 @@ export default function AttendancePage() {
 
   const fetchDateRangeAttendance = async () => {
     if (!startDate || !endDate) {
-      alert('Please select both start and end dates');
+      showToast('Please select both start and end dates', 'error');
       return;
     }
 
     setLoading(true);
     try {
-      const data: any = await attendanceApi.getReport(
+      const data = await attendanceApi.getReport(
         startDate,
         endDate,
         departmentFilter !== 'all' ? departmentFilter : undefined
-      );
-      setAttendances(data.attendances);
-      setFilteredAttendances(data.attendances);
+      ) as any;
+      setAttendances(data.attendances as Attendance[]);
+      setFilteredAttendances(data.attendances as Attendance[]);
       setViewMode('range');
-    } catch (error) {
+      showToast('Report generated successfully', 'success');
+    } catch (error: any) {
       console.error('Failed to fetch attendance report:', error);
+      showToast(error.message || 'Failed to fetch attendance report', 'error');
     } finally {
       setLoading(false);
     }
@@ -100,18 +180,16 @@ export default function AttendancePage() {
   const filterAttendances = () => {
     let filtered = attendances;
 
-    // Search by employee ID or name
     if (searchQuery) {
       filtered = filtered.filter(
         (a) =>
-          a.employee.employeeId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          a.employee.fullName.toLowerCase().includes(searchQuery.toLowerCase())
+          a.employee?.employeeId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          a.employee?.fullName?.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
-    // Filter by department
     if (departmentFilter !== 'all') {
-      filtered = filtered.filter((a) => a.employee.department === departmentFilter);
+      filtered = filtered.filter((a) => a.employee?.department === departmentFilter);
     }
 
     setFilteredAttendances(filtered);
@@ -119,21 +197,27 @@ export default function AttendancePage() {
 
   const calculateStatistics = () => {
     const total = filteredAttendances.length;
-    const onTime = filteredAttendances.filter((a) => a.status === 'ON_TIME').length;
-    const late = filteredAttendances.filter((a) => a.status === 'LATE').length;
+    const onTime = filteredAttendances.filter((a) => a.status === AttendanceStatus.ON_TIME).length;
+    const late = filteredAttendances.filter((a) => a.status === AttendanceStatus.LATE).length;
+    const completed = filteredAttendances.filter((a) => a.shiftCompleted).length;
+    const incomplete = filteredAttendances.filter((a) => !a.clockOutTime).length;
+    const overtime = filteredAttendances.filter((a) => a.overtimeMinutes && a.overtimeMinutes > 0).length;
     const onTimePercentage = total > 0 ? Math.round((onTime / total) * 100) : 0;
 
     setStatistics({
       total,
       onTime,
       late,
+      completed,
+      incomplete,
+      overtime,
       onTimePercentage,
     });
   };
 
   const exportToCSV = () => {
     if (filteredAttendances.length === 0) {
-      alert('No data to export');
+      showToast('No data to export', 'error');
       return;
     }
 
@@ -141,20 +225,26 @@ export default function AttendancePage() {
       'Employee ID',
       'Employee Name',
       'Department',
+      'Shift',
       'Clock In',
       'Clock Out',
       'Duration (min)',
+      'Overtime (min)',
+      'Shift Completed',
       'Status',
       'Method',
     ];
 
     const rows = filteredAttendances.map((a) => [
-      a.employee.employeeId,
-      a.employee.fullName,
-      a.employee.department,
+      a.employee?.employeeId || 'N/A',
+      a.employee?.fullName || 'Unknown',
+      a.employee?.department || 'N/A',
+      a.employee?.shift?.name ? `${a.employee.shift.name} (${a.employee.shift.startTime}-${a.employee.shift.endTime})` : 'N/A',
       new Date(a.clockInTime).toLocaleString(),
-      a.clockOutTime ? new Date(a.clockOutTime).toLocaleString() : 'Not yet',
+      a.clockOutTime ? new Date(a.clockOutTime).toLocaleString() : 'Not clocked out',
       a.workDurationMinutes || '-',
+      a.overtimeMinutes || '0',
+      a.shiftCompleted ? 'Yes' : 'No',
       a.status,
       a.clockInMethod,
     ]);
@@ -166,16 +256,17 @@ export default function AttendancePage() {
     a.href = url;
     a.download = `attendance-report-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
+    showToast('Report exported successfully', 'success');
   };
 
-  const formatTime = (dateString: string) => {
+  const formatTime = (dateString: string): string => {
     return new Date(dateString).toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
     });
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string): string => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -183,11 +274,49 @@ export default function AttendancePage() {
     });
   };
 
-  const formatDuration = (minutes?: number) => {
+  const formatDuration = (minutes?: number): string => {
     if (!minutes) return '-';
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return `${hours}h ${mins}m`;
+  };
+
+  const getStatusColor = (status: AttendanceStatus): string => {
+    switch (status) {
+      case AttendanceStatus.ON_TIME:
+        return 'bg-green-100 text-green-700';
+      case AttendanceStatus.LATE:
+        return 'bg-rose-100 text-rose-700';
+      case AttendanceStatus.OVERTIME:
+        return 'bg-purple-100 text-purple-700';
+      case AttendanceStatus.COMPLETED:
+        return 'bg-blue-100 text-blue-700';
+      case AttendanceStatus.EARLY_DEPARTURE:
+        return 'bg-yellow-100 text-yellow-700';
+      case AttendanceStatus.INCOMPLETE:
+        return 'bg-orange-100 text-orange-700';
+      default:
+        return 'bg-slate-100 text-slate-700';
+    }
+  };
+
+  const getStatusLabel = (status: AttendanceStatus): string => {
+    switch (status) {
+      case AttendanceStatus.ON_TIME:
+        return 'On Time';
+      case AttendanceStatus.LATE:
+        return 'Late';
+      case AttendanceStatus.OVERTIME:
+        return 'Overtime';
+      case AttendanceStatus.COMPLETED:
+        return 'Completed';
+      case AttendanceStatus.EARLY_DEPARTURE:
+        return 'Early Exit';
+      case AttendanceStatus.INCOMPLETE:
+        return 'Incomplete';
+      default:
+        return status;
+    }
   };
 
   // Pagination
@@ -213,6 +342,15 @@ export default function AttendancePage() {
 
   return (
     <div className="space-y-4">
+      {/* Toast */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
@@ -238,7 +376,6 @@ export default function AttendancePage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-6 gap-3">
-          {/* Start Date */}
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1">
               Start Date
@@ -251,7 +388,6 @@ export default function AttendancePage() {
             />
           </div>
 
-          {/* End Date */}
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1">
               End Date
@@ -264,7 +400,6 @@ export default function AttendancePage() {
             />
           </div>
 
-          {/* Department Filter */}
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1">
               Department
@@ -283,7 +418,6 @@ export default function AttendancePage() {
             </select>
           </div>
 
-          {/* Search */}
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1">
               Search
@@ -300,7 +434,6 @@ export default function AttendancePage() {
             </div>
           </div>
 
-          {/* Apply Filter Button */}
           <div className="flex items-end">
             <button
               onClick={fetchDateRangeAttendance}
@@ -310,13 +443,14 @@ export default function AttendancePage() {
             </button>
           </div>
 
-          {/* Today Button */}
           <div className="flex items-end">
             <button
               onClick={() => {
                 fetchTodayAttendance();
                 setSearchQuery('');
                 setDepartmentFilter('all');
+                setStartDate('');
+                setEndDate('');
               }}
               className="w-full px-3 py-2 bg-slate-600 text-white text-sm font-medium rounded hover:bg-slate-700 transition-colors flex items-center justify-center space-x-1.5"
             >
@@ -328,10 +462,10 @@ export default function AttendancePage() {
       </div>
 
       {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
         <div className="bg-white rounded shadow-sm border border-slate-200 p-4">
           <div className="flex items-center justify-between mb-1.5">
-            <h3 className="text-xs font-medium text-slate-600">Total Records</h3>
+            <h3 className="text-xs font-medium text-slate-600">Total</h3>
             <Calendar className="w-4 h-4 text-blue-600" />
           </div>
           <p className="text-2xl font-semibold text-slate-900">{statistics.total}</p>
@@ -355,12 +489,26 @@ export default function AttendancePage() {
 
         <div className="bg-white rounded shadow-sm border border-slate-200 p-4">
           <div className="flex items-center justify-between mb-1.5">
-            <h3 className="text-xs font-medium text-slate-600">On-Time Rate</h3>
-            <Clock className="w-4 h-4 text-slate-600" />
+            <h3 className="text-xs font-medium text-slate-600">Completed</h3>
+            <CheckCircle className="w-4 h-4 text-blue-600" />
           </div>
-          <p className="text-2xl font-semibold text-slate-900">
-            {statistics.onTimePercentage}%
-          </p>
+          <p className="text-2xl font-semibold text-blue-600">{statistics.completed}</p>
+        </div>
+
+        <div className="bg-white rounded shadow-sm border border-slate-200 p-4">
+          <div className="flex items-center justify-between mb-1.5">
+            <h3 className="text-xs font-medium text-slate-600">Incomplete</h3>
+            <XCircle className="w-4 h-4 text-orange-600" />
+          </div>
+          <p className="text-2xl font-semibold text-orange-600">{statistics.incomplete}</p>
+        </div>
+
+        <div className="bg-white rounded shadow-sm border border-slate-200 p-4">
+          <div className="flex items-center justify-between mb-1.5">
+            <h3 className="text-xs font-medium text-slate-600">Overtime</h3>
+            <Clock className="w-4 h-4 text-purple-600" />
+          </div>
+          <p className="text-2xl font-semibold text-purple-600">{statistics.overtime}</p>
         </div>
       </div>
 
@@ -386,6 +534,9 @@ export default function AttendancePage() {
                   Department
                 </th>
                 <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
+                  Shift
+                </th>
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
                   Clock In
                 </th>
                 <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
@@ -395,10 +546,13 @@ export default function AttendancePage() {
                   Duration
                 </th>
                 <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
-                  Status
+                  Overtime
                 </th>
                 <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
-                  Method
+                  Shift Status
+                </th>
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
+                  Status
                 </th>
               </tr>
             </thead>
@@ -409,15 +563,27 @@ export default function AttendancePage() {
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div>
                         <div className="text-sm font-medium text-slate-900">
-                          {attendance.employee.fullName}
+                          {attendance.employee?.fullName || 'Unknown Employee'}
                         </div>
                         <div className="text-xs text-slate-500">
-                          {attendance.employee.employeeId}
+                          {attendance.employee?.employeeId || 'N/A'}
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-xs text-slate-900">
-                      {attendance.employee.department}
+                      {attendance.employee?.department || 'N/A'}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div>
+                        <div className="text-xs font-medium text-slate-900">
+                          {attendance.employee?.shift?.name || 'N/A'}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          {attendance.employee?.shift?.startTime && attendance.employee?.shift?.endTime
+                            ? `${attendance.employee.shift.startTime} - ${attendance.employee.shift.endTime}`
+                            : '-'}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div>
@@ -430,33 +596,40 @@ export default function AttendancePage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-xs text-slate-900">
-                      {attendance.clockOutTime
-                        ? formatTime(attendance.clockOutTime)
-                        : '-'}
+                      {attendance.clockOutTime ? formatTime(attendance.clockOutTime) : '-'}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-xs text-slate-900">
                       {formatDuration(attendance.workDurationMinutes)}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                          attendance.status === 'ON_TIME'
-                            ? 'bg-green-100 text-green-700'
-                            : attendance.status === 'LATE'
-                            ? 'bg-rose-100 text-rose-700'
-                            : 'bg-yellow-100 text-yellow-700'
-                        }`}
-                      >
-                        {attendance.status === 'ON_TIME'
-                          ? 'On Time'
-                          : attendance.status === 'LATE'
-                          ? 'Late'
-                          : attendance.status}
-                      </span>
+                      {attendance.overtimeMinutes && attendance.overtimeMinutes > 0 ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
+                          +{formatDuration(attendance.overtimeMinutes)}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-400">-</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
-                        {attendance.clockInMethod}
+                      {attendance.clockOutTime ? (
+                        attendance.shiftCompleted ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
+                            ✓ Completed
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700">
+                            ⚠ Early Exit
+                          </span>
+                        )
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700">
+                          ✗ Incomplete
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(attendance.status)}`}>
+                        {getStatusLabel(attendance.status)}
                       </span>
                     </td>
                   </tr>
@@ -464,7 +637,7 @@ export default function AttendancePage() {
               ) : (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={9}
                     className="px-4 py-8 text-center text-sm text-slate-500"
                   >
                     No attendance records found
@@ -489,9 +662,9 @@ export default function AttendancePage() {
               >
                 <ChevronLeft className="w-4 h-4 text-slate-600" />
               </button>
-              
+
               {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let pageNum;
+                let pageNum: number;
                 if (totalPages <= 5) {
                   pageNum = i + 1;
                 } else if (currentPage <= 3) {
@@ -501,16 +674,15 @@ export default function AttendancePage() {
                 } else {
                   pageNum = currentPage - 2 + i;
                 }
-                
+
                 return (
                   <button
                     key={pageNum}
                     onClick={() => goToPage(pageNum)}
-                    className={`px-2.5 py-1.5 text-xs font-medium rounded transition-colors ${
-                      currentPage === pageNum
-                        ? 'bg-blue-600 text-white'
-                        : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
-                    }`}
+                    className={`px-2.5 py-1.5 text-xs font-medium rounded transition-colors ${currentPage === pageNum
+                      ? 'bg-blue-600 text-white'
+                      : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
+                      }`}
                   >
                     {pageNum}
                   </button>

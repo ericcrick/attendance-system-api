@@ -9,6 +9,9 @@ export enum AttendanceStatus {
   LATE = 'LATE',
   EARLY_DEPARTURE = 'EARLY_DEPARTURE',
   ABSENT = 'ABSENT',
+  OVERTIME = 'OVERTIME',
+  INCOMPLETE = 'INCOMPLETE',
+  COMPLETED = 'COMPLETED',
 }
 
 export enum EmploymentStatus {
@@ -90,6 +93,8 @@ export interface Attendance {
   clockOutPhoto?: string;
   status: AttendanceStatus;
   workDurationMinutes?: number;
+  overtimeMinutes?: number;
+  shiftCompleted: boolean;
   clockInLocation?: string;
   clockOutLocation?: string;
   notes?: string;
