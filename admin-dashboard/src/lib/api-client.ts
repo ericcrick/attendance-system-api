@@ -372,6 +372,13 @@ export const attendanceApi = {
   clockOut: (data: any) => apiClient.post('/attendance/clock-out', data),
 
   verify: (data: any) => apiClient.post('/attendance/verify', data),
+
+  getLeaderboard: (period: string, department?: string) => {
+    const params: string[] = [`period=${encodeURIComponent(period)}`];
+    if (department) params.push(`department=${encodeURIComponent(department)}`);
+    const queryString = `?${params.join('&')}`;
+    return apiClient.get(`/attendance/leaderboard${queryString}`);
+  },
 };
 
 

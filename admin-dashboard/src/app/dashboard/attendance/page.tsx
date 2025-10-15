@@ -110,19 +110,6 @@ export default function AttendancePage() {
     setToast({ message, type });
   };
 
-  // const fetchDepartments = async () => {
-  //   try {
-  //     const employees = await employeesApi.getAll();
-  //     const uniqueDepts = [...new Set(
-  //       (employees as any[])
-  //         .map((emp: any) => emp.department)
-  //         .filter(Boolean)
-  //     )];
-  //     setDepartments(uniqueDepts as string[]);
-  //   } catch (error) {
-  //     console.error('Failed to fetch departments:', error);
-  //   }
-  // };
 
   const fetchDepartments = async () => {
     try {
