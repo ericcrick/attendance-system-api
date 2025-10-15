@@ -12,6 +12,7 @@ import { EmployeesService } from '../employees/employees.service';
 import { AuthMethod, AttendanceStatus } from '../../common/enums';
 import { Employee } from '../employees/entities/employee.entity';
 import { LeavesService } from '../leaves/leaves.service';
+import { EmployeePerformance, LeaderboardQueryDto, TimePeriod } from './dto/leaderboard.dto';
 
 @Injectable()
 export class AttendanceService {
@@ -84,135 +85,6 @@ export class AttendanceService {
             verified: true,
         };
     }
-
-    // async clockIn(clockInDto: ClockInDto): Promise<Attendance> {
-    //     const verifyDto: VerifyEmployeeDto = {
-    //         method: clockInDto.method,
-    //         rfidCardId: clockInDto.rfidCardId,
-    //         employeeId: clockInDto.employeeId,
-    //         pinCode: clockInDto.pinCode,
-    //         faceEncoding: clockInDto.faceEncoding,
-    //     };
-
-    //     const { employee } = await this.verifyEmployee(verifyDto);
-
-    //     const today = new Date();
-    //     today.setHours(0, 0, 0, 0);
-    //     const tomorrow = new Date(today);
-    //     tomorrow.setDate(tomorrow.getDate() + 1);
-
-    //     // Check if employee has any attendance record for today
-    //     const todayAttendance = await this.attendanceRepository.findOne({
-    //         where: {
-    //             employeeId: employee.id,
-    //             clockInTime: Between(today, tomorrow),
-    //         },
-    //         order: {
-    //             clockInTime: 'DESC',
-    //         },
-    //     });
-
-    //     if (todayAttendance) {
-    //         // If they haven't clocked out yet
-    //         if (!todayAttendance.clockOutTime) {
-    //             throw new BadRequestException(
-    //                 'You have already clocked in today and have not clocked out yet. Please clock out before clocking in again.',
-    //             );
-    //         }
-    //         // If they have already completed a full cycle (clocked in and out)
-    //         else {
-    //             throw new BadRequestException(
-    //                 'You have already completed your attendance for today. You clocked in and out successfully.',
-    //             );
-    //         }
-    //     }
-
-    //     const fullEmployee = await this.employeesService.findOne(employee.id);
-
-    //     const clockInTime = new Date();
-    //     const status = fullEmployee.shift.isLateArrival(clockInTime)
-    //         ? AttendanceStatus.LATE
-    //         : AttendanceStatus.ON_TIME;
-
-    //     const attendance = this.attendanceRepository.create({
-    //         employeeId: employee.id,
-    //         clockInTime,
-    //         clockInMethod: clockInDto.method,
-    //         clockInPhoto: clockInDto.photoUrl,
-    //         clockInLocation: clockInDto.location,
-    //         status,
-    //     });
-
-    //     return this.attendanceRepository.save(attendance);
-    // }
-
-    // async clockOut(clockOutDto: ClockOutDto): Promise<Attendance> {
-    //     const verifyDto: VerifyEmployeeDto = {
-    //         method: clockOutDto.method,
-    //         rfidCardId: clockOutDto.rfidCardId,
-    //         employeeId: clockOutDto.employeeId,
-    //         pinCode: clockOutDto.pinCode,
-    //         faceEncoding: clockOutDto.faceEncoding,
-    //     };
-
-    //     const { employee } = await this.verifyEmployee(verifyDto);
-
-    //     const today = new Date();
-    //     today.setHours(0, 0, 0, 0);
-    //     const tomorrow = new Date(today);
-    //     tomorrow.setDate(tomorrow.getDate() + 1);
-
-    //     // First, check if there's an already completed attendance (clocked in and out)
-    //     const completedAttendance = await this.attendanceRepository.findOne({
-    //         where: {
-    //             employeeId: employee.id,
-    //             clockInTime: Between(today, tomorrow),
-    //         },
-    //         order: {
-    //             clockInTime: 'DESC',
-    //         },
-    //     });
-
-    //     if (completedAttendance && completedAttendance.clockOutTime) {
-    //         const clockOutTimeFormatted = completedAttendance.clockOutTime.toLocaleTimeString('en-US', {
-    //             hour: '2-digit',
-    //             minute: '2-digit',
-    //             hour12: true,
-    //         });
-    //         throw new BadRequestException(
-    //             `You have already clocked out today at ${clockOutTimeFormatted}. You cannot clock out again.`,
-    //         );
-    //     }
-
-    //     // Find active clock-in record (not clocked out yet)
-    //     const attendance = await this.attendanceRepository.findOne({
-    //         where: {
-    //             employeeId: employee.id,
-    //             clockInTime: Between(today, tomorrow),
-    //             clockOutTime: null as any,
-    //         },
-    //     });
-
-    //     if (!attendance) {
-    //         throw new BadRequestException(
-    //             'No active clock-in record found for today. Please clock in first before clocking out.',
-    //         );
-    //     }
-
-    //     // Update attendance record
-    //     attendance.clockOutTime = new Date();
-    //     attendance.clockOutMethod = clockOutDto.method;
-    //     attendance.clockOutPhoto = clockOutDto.photoUrl;
-    //     attendance.clockOutLocation = clockOutDto.location;
-    //     attendance.notes = clockOutDto.notes;
-
-    //     // Calculate work duration
-    //     attendance.calculateWorkDuration();
-
-    //     return this.attendanceRepository.save(attendance);
-    // }
-
-
 
 
 
@@ -528,5 +400,263 @@ export class AttendanceService {
         }
 
         return dotProduct / (magnitude1 * magnitude2);
+    }
+
+
+
+
+
+    async getLeaderboard(queryDto: LeaderboardQueryDto): Promise<{
+        topPerformers: EmployeePerformance[];
+        bottomPerformers: EmployeePerformance[];
+        period: { startDate: Date; endDate: Date };
+        statistics: any;
+    }> {
+        const { startDate, endDate } = this.calculateDateRange(queryDto);
+
+        // Get all active employees
+        const employees = await this.employeesService.findAll(false);
+
+        // Calculate performance for each employee
+        const performances: EmployeePerformance[] = await Promise.all(
+            employees.map((employee) =>
+                this.calculateEmployeePerformance(employee, startDate, endDate),
+            ),
+        );
+
+        // Filter out employees with no attendance data
+        const validPerformances = performances.filter((p) => p.totalDays > 0);
+
+        // Sort by score (descending)
+        validPerformances.sort((a, b) => b.score - a.score);
+
+        // Assign ranks
+        validPerformances.forEach((perf, index) => {
+            perf.rank = index + 1;
+        });
+
+        // Get top 10 and bottom 10
+        const topPerformers = validPerformances.slice(0, 10);
+        const bottomPerformers = validPerformances
+            .slice(-10)
+            .reverse();
+
+        // Calculate overall statistics
+        const statistics = this.calculateOverallStatistics(validPerformances);
+
+        return {
+            topPerformers,
+            bottomPerformers,
+            period: { startDate, endDate },
+            statistics,
+        };
+    }
+
+
+
+    private calculateWorkingDays(startDate: Date, endDate: Date): number {
+        let count = 0;
+        const current = new Date(startDate);
+
+        while (current <= endDate) {
+            // Count ALL days since staff work weekends too
+            count++;
+            current.setDate(current.getDate() + 1);
+        }
+
+        return count;
+    }
+
+    private calculateDateRange(queryDto: LeaderboardQueryDto): {
+        startDate: Date;
+        endDate: Date;
+    } {
+        const now = new Date();
+        let startDate: Date;
+        let endDate: Date = new Date(now);
+        endDate.setHours(23, 59, 59, 999);
+
+        if (queryDto.period === TimePeriod.CUSTOM && queryDto.startDate && queryDto.endDate) {
+            startDate = new Date(queryDto.startDate);
+            endDate = new Date(queryDto.endDate);
+            endDate.setHours(23, 59, 59, 999);
+        } else {
+            switch (queryDto.period) {
+                case TimePeriod.WEEKLY:
+                    startDate = new Date(now);
+                    startDate.setDate(now.getDate() - 7); // Last 7 days
+                    startDate.setHours(0, 0, 0, 0);
+                    break;
+
+                case TimePeriod.MONTHLY:
+                    startDate = new Date(now);
+                    startDate.setDate(now.getDate() - 30); // Last 30 days
+                    startDate.setHours(0, 0, 0, 0);
+                    break;
+
+                case TimePeriod.YEARLY:
+                    startDate = new Date(now);
+                    startDate.setDate(now.getDate() - 365); // Last 365 days
+                    startDate.setHours(0, 0, 0, 0);
+                    break;
+
+                default:
+                    startDate = new Date(now);
+                    startDate.setDate(now.getDate() - 30); // Default to last 30 days
+                    startDate.setHours(0, 0, 0, 0);
+            }
+        }
+
+        return { startDate, endDate };
+    }
+
+
+
+    private async calculateEmployeePerformance(
+        employee: any,
+        startDate: Date,
+        endDate: Date,
+    ): Promise<EmployeePerformance> {
+        // Get attendance records for the period
+        const attendances = await this.attendanceRepository.find({
+            where: {
+                employeeId: employee.id,
+                clockInTime: Between(startDate, endDate),
+            },
+            order: {
+                clockInTime: 'DESC',
+            },
+        });
+
+        // Calculate total expected working days (excluding weekends)
+        const totalDays = this.calculateWorkingDays(startDate, endDate);
+        const attendedDays = attendances.length;
+        const absentDays = totalDays - attendedDays;
+
+        // Calculate various metrics
+        const lateDays = attendances.filter((a) => a.status === AttendanceStatus.LATE).length;
+        const onTimeDays = attendances.filter((a) => a.status === AttendanceStatus.ON_TIME).length;
+        const completedShifts = attendances.filter((a) => a.shiftCompleted).length;
+        const incompleteShifts = attendances.filter((a) => !a.clockOutTime || !a.shiftCompleted).length;
+
+        // Calculate total overtime and work hours
+        const totalOvertimeMinutes = attendances.reduce(
+            (sum, a) => sum + (a.overtimeMinutes || 0),
+            0,
+        );
+        const totalWorkMinutes = attendances.reduce(
+            (sum, a) => sum + (a.workDurationMinutes || 0),
+            0,
+        );
+
+        // Calculate rates
+        const attendanceRate = totalDays > 0 ? (attendedDays / totalDays) * 100 : 0;
+        const onTimeRate = attendedDays > 0 ? (onTimeDays / attendedDays) * 100 : 0;
+        const completionRate = attendedDays > 0 ? (completedShifts / attendedDays) * 100 : 0;
+        const averageWorkHours = attendedDays > 0 ? totalWorkMinutes / 60 / attendedDays : 0;
+
+        // Calculate performance score (weighted)
+        const score = this.calculatePerformanceScore({
+            attendanceRate,
+            onTimeRate,
+            completionRate,
+            overtimeHours: totalOvertimeMinutes / 60,
+        });
+
+        return {
+            employeeId: employee.employeeId,
+            employeeName: employee.fullName,
+            department: employee.department,
+            position: employee.position,
+            photoUrl: employee.photoUrl,
+            totalDays,
+            attendedDays,
+            absentDays,
+            lateDays,
+            onTimeDays,
+            overtimeHours: Math.round((totalOvertimeMinutes / 60) * 10) / 10,
+            completedShifts,
+            incompleteShifts,
+            attendanceRate: Math.round(attendanceRate * 10) / 10,
+            onTimeRate: Math.round(onTimeRate * 10) / 10,
+            completionRate: Math.round(completionRate * 10) / 10,
+            averageWorkHours: Math.round(averageWorkHours * 10) / 10,
+            totalWorkMinutes,
+            score: Math.round(score * 10) / 10,
+            rank: 0,
+            trend: 'stable',
+        };
+    }
+
+
+    private calculatePerformanceScore(metrics: {
+        attendanceRate: number;
+        onTimeRate: number;
+        completionRate: number;
+        overtimeHours: number;
+    }): number {
+        // Weighted scoring system
+        const weights = {
+            attendance: 0.4, // 40% weight
+            onTime: 0.3, // 30% weight
+            completion: 0.25, // 25% weight
+            overtime: 0.05, // 5% weight (bonus)
+        };
+
+        let score = 0;
+
+        // Attendance rate contribution
+        score += metrics.attendanceRate * weights.attendance;
+
+        // On-time rate contribution
+        score += metrics.onTimeRate * weights.onTime;
+
+        // Completion rate contribution
+        score += metrics.completionRate * weights.completion;
+
+        // Overtime bonus (capped at 5 points)
+        const overtimeBonus = Math.min(metrics.overtimeHours * 0.5, 5);
+        score += overtimeBonus * weights.overtime * 100;
+
+        return Math.min(score, 100); // Cap at 100
+    }
+
+    private calculateOverallStatistics(performances: EmployeePerformance[]): any {
+        if (performances.length === 0) {
+            return {
+                averageAttendanceRate: 0,
+                averageOnTimeRate: 0,
+                averageCompletionRate: 0,
+                totalEmployees: 0,
+                excellentPerformers: 0,
+                goodPerformers: 0,
+                poorPerformers: 0,
+            };
+        }
+
+        const avgAttendance =
+            performances.reduce((sum, p) => sum + p.attendanceRate, 0) /
+            performances.length;
+        const avgOnTime =
+            performances.reduce((sum, p) => sum + p.onTimeRate, 0) /
+            performances.length;
+        const avgCompletion =
+            performances.reduce((sum, p) => sum + p.completionRate, 0) /
+            performances.length;
+
+        // Categorize performers
+        const excellent = performances.filter((p) => p.score >= 90).length;
+        const good = performances.filter((p) => p.score >= 70 && p.score < 90).length;
+        const poor = performances.filter((p) => p.score < 70).length;
+
+        return {
+            averageAttendanceRate: Math.round(avgAttendance * 10) / 10,
+            averageOnTimeRate: Math.round(avgOnTime * 10) / 10,
+            averageCompletionRate: Math.round(avgCompletion * 10) / 10,
+            totalEmployees: performances.length,
+            excellentPerformers: excellent,
+            goodPerformers: good,
+            poorPerformers: poor,
+        };
     }
 }

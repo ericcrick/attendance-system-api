@@ -1,3 +1,4 @@
+// src/modules/attendance/attendance.controller.ts
 import {
     Controller,
     Get,
@@ -20,10 +21,10 @@ import {
     ClockInDto,
     ClockOutDto,
     VerifyEmployeeDto,
-    GetAttendanceQueryDto,
 } from './dto/attendance.dto';
 import { Attendance } from './entities/attendance.entity';
 import { Public } from '../auth/decorators/public.decorator';
+import { LeaderboardQueryDto } from './dto/leaderboard.dto';
 
 @ApiTags('attendance')
 @Controller('attendance')
@@ -98,24 +99,16 @@ export class AttendanceController {
         return this.attendanceService.getCurrentlyPresent();
     }
 
+    // IMPORTANT: Move leaderboard route BEFORE :id route
     @ApiBearerAuth('JWT-auth')
-    @Get('employee/:employeeId')
-    @ApiOperation({ summary: 'Get attendance records for a specific employee' })
-    @ApiQuery({ name: 'startDate', required: false, type: String })
-    @ApiQuery({ name: 'endDate', required: false, type: String })
+    @Get('leaderboard')
+    @ApiOperation({ summary: 'Get attendance leaderboard' })
     @ApiResponse({
         status: 200,
-        description: 'Employee attendance records',
-        type: [Attendance],
+        description: 'Leaderboard data retrieved successfully',
     })
-    getEmployeeAttendance(
-        @Param('employeeId') employeeId: string,
-        @Query('startDate') startDate?: string,
-        @Query('endDate') endDate?: string,
-    ): Promise<Attendance[]> {
-        const start = startDate ? new Date(startDate) : undefined;
-        const end = endDate ? new Date(endDate) : undefined;
-        return this.attendanceService.getEmployeeAttendance(employeeId, start, end);
+    async getLeaderboard(@Query() queryDto: LeaderboardQueryDto) {
+        return this.attendanceService.getLeaderboard(queryDto);
     }
 
     @ApiBearerAuth('JWT-auth')
@@ -140,6 +133,27 @@ export class AttendanceController {
         );
     }
 
+    @ApiBearerAuth('JWT-auth')
+    @Get('employee/:employeeId')
+    @ApiOperation({ summary: 'Get attendance records for a specific employee' })
+    @ApiQuery({ name: 'startDate', required: false, type: String })
+    @ApiQuery({ name: 'endDate', required: false, type: String })
+    @ApiResponse({
+        status: 200,
+        description: 'Employee attendance records',
+        type: [Attendance],
+    })
+    getEmployeeAttendance(
+        @Param('employeeId') employeeId: string,
+        @Query('startDate') startDate?: string,
+        @Query('endDate') endDate?: string,
+    ): Promise<Attendance[]> {
+        const start = startDate ? new Date(startDate) : undefined;
+        const end = endDate ? new Date(endDate) : undefined;
+        return this.attendanceService.getEmployeeAttendance(employeeId, start, end);
+    }
+
+    // IMPORTANT: :id route must come LAST to avoid catching specific routes
     @ApiBearerAuth('JWT-auth')
     @Get(':id')
     @ApiOperation({ summary: 'Get attendance record by ID' })
