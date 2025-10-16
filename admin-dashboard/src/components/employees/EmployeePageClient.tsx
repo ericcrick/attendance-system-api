@@ -17,12 +17,14 @@ import {
     Camera,
     ChevronLeft,
     ChevronRight,
+    Fingerprint,
 } from 'lucide-react';
 import { employeesApi, shiftsApi } from '@/lib/api-client';
 import { Employee, Shift } from '@/types';
 import CreateEmployeeModal from '@/components/employees/CreateEmployeeModal';
 import EditEmployeeModal from '@/components/employees/EditEmployeeModal';
 import FaceEnrollmentModal from '@/components/employees/FaceEnrollmentModal';
+import FingerprintEnrollmentModal from './FingerprintEnrollmentModal';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -39,6 +41,10 @@ export default function EmployeesPageClient() {
     const [faceEnrollEmployee, setFaceEnrollEmployee] = useState<Employee | null>(null);
     const [showEditModal, setShowEditModal] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
+
+    const [showFingerprintEnrollModal, setShowFingerprintEnrollModal] = useState(false);
+    const [fingerprintEnrollEmployee, setFingerprintEnrollEmployee] = useState<Employee | null>(null);
+
 
     useEffect(() => {
         fetchData();
@@ -62,6 +68,11 @@ export default function EmployeesPageClient() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleEnrollFingerprint = (employee: Employee) => {
+        setFingerprintEnrollEmployee(employee);
+        setShowFingerprintEnrollModal(true);
     };
 
     const filterEmployees = () => {
@@ -250,7 +261,7 @@ export default function EmployeesPageClient() {
                                                 {employee.shift.name}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3 whitespace-nowrap">
+                                        {/* <td className="px-4 py-3 whitespace-nowrap">
                                             <div className="flex items-center space-x-1.5">
                                                 {employee.rfidCardId && (
                                                     <span className="inline-flex items-center text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
@@ -271,12 +282,42 @@ export default function EmployeesPageClient() {
                                                     </span>
                                                 )}
                                             </div>
+                                        </td> */}
+
+
+                                        <td className="px-4 py-3 whitespace-nowrap">
+                                            <div className="flex items-center space-x-1.5">
+                                                {employee.rfidCardId && (
+                                                    <span className="inline-flex items-center text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                                                        <CreditCard className="w-3 h-3 mr-0.5" />
+                                                        RFID
+                                                    </span>
+                                                )}
+                                                {employee.pinCode && (
+                                                    <span className="inline-flex items-center text-xs text-green-600 bg-green-50 px-1.5 py-0.5 rounded">
+                                                        <Hash className="w-3 h-3 mr-0.5" />
+                                                        PIN
+                                                    </span>
+                                                )}
+                                                {employee.faceEncoding && (
+                                                    <span className="inline-flex items-center text-xs text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
+                                                        <Camera className="w-3 h-3 mr-0.5" />
+                                                        Face
+                                                    </span>
+                                                )}
+                                                {employee.fingerprintTemplate && (
+                                                    <span className="inline-flex items-center text-xs text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded">
+                                                        <Fingerprint className="w-3 h-3 mr-0.5" />
+                                                        Print
+                                                    </span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="px-4 py-3 whitespace-nowrap">
                                             <span
                                                 className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${employee.status === 'ACTIVE'
-                                                        ? 'bg-green-100 text-green-700'
-                                                        : 'bg-rose-100 text-rose-700'
+                                                    ? 'bg-green-100 text-green-700'
+                                                    : 'bg-rose-100 text-rose-700'
                                                     }`}
                                             >
                                                 {employee.status}
@@ -299,10 +340,17 @@ export default function EmployeesPageClient() {
                                                     <Camera className="w-4 h-4" />
                                                 </button>
                                                 <button
+                                                    onClick={() => handleEnrollFingerprint(employee)}
+                                                    className="text-purple-600 hover:text-purple-900"
+                                                    title="Enroll Fingerprint"
+                                                >
+                                                    <Fingerprint className="w-4 h-4" />
+                                                </button>
+                                                <button
                                                     onClick={() => handleToggleStatus(employee)}
                                                     className={`${employee.status === 'ACTIVE'
-                                                            ? 'text-rose-600 hover:text-rose-900'
-                                                            : 'text-green-600 hover:text-green-900'
+                                                        ? 'text-rose-600 hover:text-rose-900'
+                                                        : 'text-green-600 hover:text-green-900'
                                                         }`}
                                                     title={
                                                         employee.status === 'ACTIVE'
@@ -374,8 +422,8 @@ export default function EmployeesPageClient() {
                                         key={pageNum}
                                         onClick={() => goToPage(pageNum)}
                                         className={`px-2.5 py-1.5 text-xs font-medium rounded transition-colors ${currentPage === pageNum
-                                                ? 'bg-blue-600 text-white'
-                                                : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
+                                            ? 'bg-blue-600 text-white'
+                                            : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
                                             }`}
                                     >
                                         {pageNum}
@@ -433,6 +481,21 @@ export default function EmployeesPageClient() {
                     onSuccess={() => {
                         setShowFaceEnrollModal(false);
                         setFaceEnrollEmployee(null);
+                        fetchData();
+                    }}
+                />
+            )}
+
+            {showFingerprintEnrollModal && fingerprintEnrollEmployee && (
+                <FingerprintEnrollmentModal
+                    employee={fingerprintEnrollEmployee}
+                    onClose={() => {
+                        setShowFingerprintEnrollModal(false);
+                        setFingerprintEnrollEmployee(null);
+                    }}
+                    onSuccess={() => {
+                        setShowFingerprintEnrollModal(false);
+                        setFingerprintEnrollEmployee(null);
                         fetchData();
                     }}
                 />

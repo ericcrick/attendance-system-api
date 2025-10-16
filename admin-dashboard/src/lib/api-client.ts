@@ -322,6 +322,13 @@ export const employeesApi = {
     apiClient.patch(`/employees/${id}/assign-face`, data),
 
   getStatistics: () => apiClient.get('/employees/statistics'),
+
+
+  assignFingerprint: (id: string, data: { fingerprintTemplate: string; fingerprintDeviceId?: string }) =>
+    apiClient.patch(`/employees/${id}/assign-fingerprint`, data),
+
+  removeFingerprint: (id: string) =>
+    apiClient.delete(`/employees/${id}/fingerprint`),
 };
 
 // Shifts API

@@ -2,8 +2,8 @@ export enum AuthMethod {
   RFID = 'RFID',
   PIN = 'PIN',
   FACIAL = 'FACIAL',
+  FINGERPRINT = 'FINGERPRINT',
 }
-
 export enum AttendanceStatus {
   ON_TIME = 'ON_TIME',
   LATE = 'LATE',
@@ -57,6 +57,31 @@ export interface Shift {
 }
 
 // src/types/index.ts - Update Employee interface
+// export interface Employee {
+//   id: string;
+//   employeeId: string;
+//   firstName: string;
+//   lastName: string;
+//   fullName: string;
+//   email?: string;
+//   phone?: string;
+//   department: string;
+//   departmentId?: string;
+//   position: string;
+//   rfidCardId?: string;
+//   pinCode?: string;
+//   photoUrl?: string;
+//   faceEncoding?: string;
+//   status: EmploymentStatus;
+//   shiftId: string;
+//   shift: Shift;
+//   dateJoined: string;
+//   notes?: string;
+//   createdAt: string;
+//   updatedAt: string;
+// }
+
+
 export interface Employee {
   id: string;
   employeeId: string;
@@ -72,6 +97,8 @@ export interface Employee {
   pinCode?: string;
   photoUrl?: string;
   faceEncoding?: string;
+  fingerprintTemplate?: string;
+  fingerprintDeviceId?: string;
   status: EmploymentStatus;
   shiftId: string;
   shift: Shift;
