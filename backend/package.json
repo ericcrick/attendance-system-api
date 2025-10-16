@@ -21,6 +21,7 @@
     "seed": "ts-node src/database/seeders/initial-data.seeder.ts"
   },
   "dependencies": {
+    "@digitalpersona/devices": "^0.2.6",
     "@nestjs/cache-manager": "^3.0.1",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",

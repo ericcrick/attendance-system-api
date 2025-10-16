@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "@digitalpersona/core": "^0.2.6",
+    "@digitalpersona/devices": "^0.2.6",
+    "@types/usb": "^2.0.5",
+    "node-hid": "^3.2.0",
+    "usb": "^2.16.0"
+  }
+}
