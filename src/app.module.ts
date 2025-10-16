@@ -11,6 +11,7 @@ import { AttendanceModule } from './modules/attendance/attendance.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { DepartmentsModule } from './modules/departments/departments.module';
 import { LeavesModule } from './modules/leaves/leaves.module';
+import { FingerprintModule } from './modules/fingerprint/fingerprint.module';
 
 @Module({
   imports: [
@@ -57,7 +58,8 @@ import { LeavesModule } from './modules/leaves/leaves.module';
     EmployeesModule,
     AttendanceModule,
     DepartmentsModule,
-    LeavesModule
+    LeavesModule,
+    FingerprintModule
   ],
   controllers: [],
   providers: [

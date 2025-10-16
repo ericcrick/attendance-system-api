@@ -1,3 +1,4 @@
+// // src/modules/employees/employees.service.ts
 // import {
 //   Injectable,
 //   NotFoundException,
@@ -16,8 +17,8 @@
 //   AssignFaceEncodingDto,
 // } from './dto/create-employee.dto';
 // import { ShiftsService } from '../shifts/shifts.service';
-// import { EmploymentStatus } from '../../common/enums';
 // import { DepartmentsService } from '../departments/departments.service';
+// import { EmploymentStatus } from '../../common/enums';
 
 // @Injectable()
 // export class EmployeesService {
@@ -25,8 +26,8 @@
 //     @InjectRepository(Employee)
 //     private readonly employeesRepository: Repository<Employee>,
 //     private readonly shiftsService: ShiftsService,
-//      private readonly departmentsService: DepartmentsService,
-//   ) {}
+//     private readonly departmentsService: DepartmentsService,
+//   ) { }
 
 //   async create(createEmployeeDto: CreateEmployeeDto): Promise<Employee> {
 //     // Check if employee ID already exists
@@ -69,6 +70,24 @@
 //     // Verify shift exists
 //     await this.shiftsService.findOne(createEmployeeDto.shiftId);
 
+//     // Verify department exists if departmentId is provided
+//     if (createEmployeeDto.departmentId) {
+//       try {
+//         const department = await this.departmentsService.findOne(
+//           createEmployeeDto.departmentId,
+//         );
+
+//         // If department name is not provided, use the department's name
+//         if (!createEmployeeDto.department) {
+//           createEmployeeDto.department = department.name;
+//         }
+//       } catch (error) {
+//         throw new BadRequestException(
+//           `Department with ID "${createEmployeeDto.departmentId}" not found`,
+//         );
+//       }
+//     }
+
 //     // Hash PIN if provided
 //     let hashedPin: string | undefined;
 //     if (createEmployeeDto.pinCode) {
@@ -85,26 +104,41 @@
 //   }
 
 //   async findAll(includeInactive = false): Promise<Employee[]> {
-//     const query: any = {};
+//     const queryBuilder = this.employeesRepository
+//       .createQueryBuilder('employee')
+//       .leftJoinAndSelect('employee.shift', 'shift')
+//       .leftJoinAndSelect('employee.departmentRelation', 'departmentRelation')
+//       .orderBy('employee.createdAt', 'DESC');
 
 //     if (!includeInactive) {
-//       query.status = EmploymentStatus.ACTIVE;
+//       queryBuilder.where('employee.status = :status', {
+//         status: EmploymentStatus.ACTIVE,
+//       });
 //     }
 
-//     return this.employeesRepository.find({
-//       where: query,
-//       order: { createdAt: 'DESC' },
-//     });
+//     return queryBuilder.getMany();
 //   }
 
 //   async findByDepartment(department: string): Promise<Employee[]> {
-//     return this.employeesRepository.find({
-//       where: {
-//         department,
-//         status: EmploymentStatus.ACTIVE,
-//       },
-//       order: { lastName: 'ASC' },
-//     });
+//     return this.employeesRepository
+//       .createQueryBuilder('employee')
+//       .leftJoinAndSelect('employee.shift', 'shift')
+//       .leftJoinAndSelect('employee.departmentRelation', 'departmentRelation')
+//       .where('employee.department = :department', { department })
+//       .andWhere('employee.status = :status', { status: EmploymentStatus.ACTIVE })
+//       .orderBy('employee.lastName', 'ASC')
+//       .getMany();
+//   }
+
+//   async findByDepartmentId(departmentId: string): Promise<Employee[]> {
+//     return this.employeesRepository
+//       .createQueryBuilder('employee')
+//       .leftJoinAndSelect('employee.shift', 'shift')
+//       .leftJoinAndSelect('employee.departmentRelation', 'departmentRelation')
+//       .where('employee.department_id = :departmentId', { departmentId })
+//       .andWhere('employee.status = :status', { status: EmploymentStatus.ACTIVE })
+//       .orderBy('employee.lastName', 'ASC')
+//       .getMany();
 //   }
 
 //   async findByShift(shiftId: string): Promise<Employee[]> {
@@ -113,6 +147,7 @@
 //         shiftId,
 //         status: EmploymentStatus.ACTIVE,
 //       },
+//       relations: ['shift', 'departmentRelation'],
 //       order: { lastName: 'ASC' },
 //     });
 //   }
@@ -120,7 +155,7 @@
 //   async findOne(id: string): Promise<Employee> {
 //     const employee = await this.employeesRepository.findOne({
 //       where: { id },
-//       relations: ['shift', 'attendances'],
+//       relations: ['shift', 'departmentRelation', 'attendances'],
 //     });
 
 //     if (!employee) {
@@ -135,6 +170,7 @@
 //     const employee = await this.employeesRepository
 //       .createQueryBuilder('employee')
 //       .leftJoinAndSelect('employee.shift', 'shift')
+//       .leftJoinAndSelect('employee.departmentRelation', 'departmentRelation')
 //       .where('LOWER(employee.employee_id) = LOWER(:employeeId)', { employeeId })
 //       .getOne();
 
@@ -152,11 +188,15 @@
 //     return this.employeesRepository
 //       .createQueryBuilder('employee')
 //       .leftJoinAndSelect('employee.shift', 'shift')
+//       .leftJoinAndSelect('employee.departmentRelation', 'departmentRelation')
 //       .where('LOWER(employee.rfid_card_id) = LOWER(:rfidCardId)', { rfidCardId })
 //       .getOne();
 //   }
 
-//   async update(id: string, updateEmployeeDto: UpdateEmployeeDto): Promise<Employee> {
+//   async update(
+//     id: string,
+//     updateEmployeeDto: UpdateEmployeeDto,
+//   ): Promise<Employee> {
 //     const employee = await this.findOne(id);
 
 //     // Check email conflict if email is being updated
@@ -165,7 +205,7 @@
 //         where: { email: updateEmployeeDto.email },
 //       });
 
-//       if (existingEmail) {
+//       if (existingEmail && existingEmail.id !== id) {
 //         throw new ConflictException(
 //           `Email "${updateEmployeeDto.email}" is already in use`,
 //         );
@@ -181,7 +221,7 @@
 //         where: { rfidCardId: updateEmployeeDto.rfidCardId },
 //       });
 
-//       if (existingRfid) {
+//       if (existingRfid && existingRfid.id !== id) {
 //         throw new ConflictException(
 //           `RFID card "${updateEmployeeDto.rfidCardId}" is already assigned`,
 //         );
@@ -189,8 +229,26 @@
 //     }
 
 //     // Verify new shift exists if shift is being updated
-//     if (updateEmployeeDto.shiftId) {
+//     if (updateEmployeeDto.shiftId && updateEmployeeDto.shiftId !== employee.shiftId) {
 //       await this.shiftsService.findOne(updateEmployeeDto.shiftId);
+//     }
+
+//     // Verify department exists if departmentId is being updated
+//     if (updateEmployeeDto.departmentId) {
+//       try {
+//         const department = await this.departmentsService.findOne(
+//           updateEmployeeDto.departmentId,
+//         );
+
+//         // Update department name to match the department relation
+//         if (!updateEmployeeDto.department) {
+//           updateEmployeeDto.department = department.name;
+//         }
+//       } catch (error) {
+//         throw new BadRequestException(
+//           `Department with ID "${updateEmployeeDto.departmentId}" not found`,
+//         );
+//       }
 //     }
 
 //     // Hash new PIN if provided
@@ -222,7 +280,10 @@
 //     return this.employeesRepository.save(employee);
 //   }
 
-//   async assignRfidCard(id: string, assignRfidDto: AssignRfidDto): Promise<Employee> {
+//   async assignRfidCard(
+//     id: string,
+//     assignRfidDto: AssignRfidDto,
+//   ): Promise<Employee> {
 //     const employee = await this.findOne(id);
 
 //     // Check if RFID card is already assigned to another employee
@@ -333,7 +394,6 @@
 
 
 
-
 // src/modules/employees/employees.service.ts
 import {
   Injectable,
@@ -351,9 +411,11 @@ import {
   AssignRfidDto,
   AssignPinDto,
   AssignFaceEncodingDto,
+  AssignFingerprintDto,
 } from './dto/create-employee.dto';
 import { ShiftsService } from '../shifts/shifts.service';
 import { DepartmentsService } from '../departments/departments.service';
+import { ZKTecoService } from './fingerprint/zkteco.service';
 import { EmploymentStatus } from '../../common/enums';
 
 @Injectable()
@@ -363,6 +425,7 @@ export class EmployeesService {
     private readonly employeesRepository: Repository<Employee>,
     private readonly shiftsService: ShiftsService,
     private readonly departmentsService: DepartmentsService,
+    private readonly zkTecoService: ZKTecoService,
   ) { }
 
   async create(createEmployeeDto: CreateEmployeeDto): Promise<Employee> {
@@ -413,7 +476,6 @@ export class EmployeesService {
           createEmployeeDto.departmentId,
         );
 
-        // If department name is not provided, use the department's name
         if (!createEmployeeDto.department) {
           createEmployeeDto.department = department.name;
         }
@@ -502,7 +564,6 @@ export class EmployeesService {
   }
 
   async findByEmployeeId(employeeId: string): Promise<Employee> {
-    // Case-insensitive search using ILIKE (PostgreSQL) or LOWER
     const employee = await this.employeesRepository
       .createQueryBuilder('employee')
       .leftJoinAndSelect('employee.shift', 'shift')
@@ -520,12 +581,20 @@ export class EmployeesService {
   }
 
   async findByRfidCard(rfidCardId: string): Promise<Employee | null> {
-    // Case-insensitive search for RFID card
     return this.employeesRepository
       .createQueryBuilder('employee')
       .leftJoinAndSelect('employee.shift', 'shift')
       .leftJoinAndSelect('employee.departmentRelation', 'departmentRelation')
       .where('LOWER(employee.rfid_card_id) = LOWER(:rfidCardId)', { rfidCardId })
+      .getOne();
+  }
+
+  async findByFingerprintDeviceId(deviceId: string): Promise<Employee | null> {
+    return this.employeesRepository
+      .createQueryBuilder('employee')
+      .leftJoinAndSelect('employee.shift', 'shift')
+      .leftJoinAndSelect('employee.departmentRelation', 'departmentRelation')
+      .where('employee.fingerprint_device_id = :deviceId', { deviceId })
       .getOne();
   }
 
@@ -576,7 +645,6 @@ export class EmployeesService {
           updateEmployeeDto.departmentId,
         );
 
-        // Update department name to match the department relation
         if (!updateEmployeeDto.department) {
           updateEmployeeDto.department = department.name;
         }
@@ -601,6 +669,14 @@ export class EmployeesService {
 
   async remove(id: string): Promise<void> {
     const employee = await this.findOne(id);
+
+    // Delete fingerprint from device if exists
+    if (employee.fingerprintDeviceId) {
+      await this.zkTecoService.deleteFingerprintFromDevice(
+        employee.fingerprintDeviceId,
+      );
+    }
+
     await this.employeesRepository.remove(employee);
   }
 
@@ -622,7 +698,6 @@ export class EmployeesService {
   ): Promise<Employee> {
     const employee = await this.findOne(id);
 
-    // Check if RFID card is already assigned to another employee
     const existingRfid = await this.employeesRepository.findOne({
       where: { rfidCardId: assignRfidDto.rfidCardId },
     });
@@ -663,6 +738,52 @@ export class EmployeesService {
     return this.employeesRepository.save(employee);
   }
 
+  async assignFingerprint(
+    id: string,
+    assignFingerprintDto: AssignFingerprintDto,
+  ): Promise<Employee> {
+    const employee = await this.findOne(id);
+
+    // Validate fingerprint template
+    if (!this.zkTecoService.validateFingerprintTemplate(
+      assignFingerprintDto.fingerprintTemplate,
+    )) {
+      throw new BadRequestException('Invalid fingerprint template data');
+    }
+
+    // Enroll on device and get device user ID
+    const deviceUserId = await this.zkTecoService.enrollFingerprintOnDevice(
+      employee.employeeId,
+      assignFingerprintDto.fingerprintTemplate,
+    );
+
+    employee.fingerprintTemplate = assignFingerprintDto.fingerprintTemplate;
+    employee.fingerprintDeviceId = assignFingerprintDto.fingerprintDeviceId || deviceUserId;
+
+    return this.employeesRepository.save(employee);
+  }
+
+  async removeFingerprint(id: string): Promise<Employee> {
+    const employee = await this.findOne(id);
+
+    if (!employee.fingerprintTemplate) {
+      throw new BadRequestException('No fingerprint enrolled for this employee');
+    }
+
+    // Delete from device if device ID exists
+    if (employee.fingerprintDeviceId) {
+      await this.zkTecoService.deleteFingerprintFromDevice(
+        employee.fingerprintDeviceId,
+      );
+    }
+
+    // TypeScript fix: Set to null instead of undefined
+    employee.fingerprintTemplate = null as any;
+    employee.fingerprintDeviceId = null as any;
+
+    return this.employeesRepository.save(employee);
+  }
+
   async verifyPin(id: string, pinCode: string): Promise<boolean> {
     const employee = await this.findOne(id);
 
@@ -671,6 +792,29 @@ export class EmployeesService {
     }
 
     return bcrypt.compare(pinCode, employee.pinCode);
+  }
+
+  async verifyFingerprint(fingerprintTemplate: string): Promise<Employee | null> {
+    const employees = await this.findAll(false);
+    const employeesWithFingerprints = employees.filter(
+      (emp) => emp.fingerprintTemplate && emp.fingerprintTemplate.length > 0,
+    );
+
+    for (const employee of employeesWithFingerprints) {
+      // TypeScript fix: Check for null/undefined before passing
+      if (!employee.fingerprintTemplate) continue;
+
+      const isMatch = await this.zkTecoService.matchFingerprints(
+        fingerprintTemplate,
+        employee.fingerprintTemplate,
+      );
+
+      if (isMatch) {
+        return employee;
+      }
+    }
+
+    return null;
   }
 
   async getStatistics() {
@@ -709,6 +853,12 @@ export class EmployeesService {
       .andWhere('employee.status = :status', { status: EmploymentStatus.ACTIVE })
       .getCount();
 
+    const withFingerprint = await this.employeesRepository
+      .createQueryBuilder('employee')
+      .where('employee.fingerprint_template IS NOT NULL')
+      .andWhere('employee.status = :status', { status: EmploymentStatus.ACTIVE })
+      .getCount();
+
     return {
       total,
       byStatus: {
@@ -721,7 +871,46 @@ export class EmployeesService {
         withRfid,
         withPin,
         withFace,
+        withFingerprint,
       },
+    };
+  }
+
+
+  async getFingerprintDeviceInfo(): Promise<any> {
+    return this.zkTecoService.getDeviceInfo();
+  }
+
+  async testFingerprintDeviceConnection(): Promise<any> {
+    return this.zkTecoService.testConnection();
+  }
+
+  async syncAllFingerprintsToDevice(): Promise<any> {
+    const employees = await this.findAll(false);
+
+    const employeesWithFingerprints = employees
+      .filter((emp) => emp.fingerprintTemplate && emp.fingerprintTemplate.length > 0)
+      .map((emp) => ({
+        id: emp.id,
+        employeeId: emp.employeeId,
+        fingerprintTemplate: emp.fingerprintTemplate!,
+      }));
+
+    if (employeesWithFingerprints.length === 0) {
+      return {
+        success: 0,
+        failed: 0,
+        message: 'No employees with fingerprints found',
+      };
+    }
+
+    const result = await this.zkTecoService.syncFingerprintsToDevice(
+      employeesWithFingerprints,
+    );
+
+    return {
+      ...result,
+      message: `Synced ${result.success} fingerprints successfully, ${result.failed} failed`,
     };
   }
 }

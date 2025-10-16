@@ -23,68 +23,68 @@ export class AttendanceService {
         private readonly leavesService: LeavesService,
     ) { }
 
-    async verifyEmployee(verifyDto: VerifyEmployeeDto): Promise<any> {
-        let employee: Employee | null = null;
+    // async verifyEmployee(verifyDto: VerifyEmployeeDto): Promise<any> {
+    //     let employee: Employee | null = null;
 
-        switch (verifyDto.method) {
-            case AuthMethod.RFID:
-                if (!verifyDto.rfidCardId) {
-                    throw new BadRequestException('RFID card ID is required');
-                }
-                employee = await this.employeesService.findByRfidCard(
-                    verifyDto.rfidCardId,
-                );
-                if (!employee) {
-                    throw new UnauthorizedException('RFID card not recognized');
-                }
-                break;
+    //     switch (verifyDto.method) {
+    //         case AuthMethod.RFID:
+    //             if (!verifyDto.rfidCardId) {
+    //                 throw new BadRequestException('RFID card ID is required');
+    //             }
+    //             employee = await this.employeesService.findByRfidCard(
+    //                 verifyDto.rfidCardId,
+    //             );
+    //             if (!employee) {
+    //                 throw new UnauthorizedException('RFID card not recognized');
+    //             }
+    //             break;
 
-            case AuthMethod.PIN:
-                if (!verifyDto.employeeId || !verifyDto.pinCode) {
-                    throw new BadRequestException('Employee ID and PIN are required');
-                }
-                employee = await this.employeesService.findByEmployeeId(verifyDto.employeeId);
-                const isPinValid = await this.employeesService.verifyPin(
-                    employee.id,
-                    verifyDto.pinCode,
-                );
-                if (!isPinValid) {
-                    throw new UnauthorizedException('Invalid PIN');
-                }
-                break;
+    //         case AuthMethod.PIN:
+    //             if (!verifyDto.employeeId || !verifyDto.pinCode) {
+    //                 throw new BadRequestException('Employee ID and PIN are required');
+    //             }
+    //             employee = await this.employeesService.findByEmployeeId(verifyDto.employeeId);
+    //             const isPinValid = await this.employeesService.verifyPin(
+    //                 employee.id,
+    //                 verifyDto.pinCode,
+    //             );
+    //             if (!isPinValid) {
+    //                 throw new UnauthorizedException('Invalid PIN');
+    //             }
+    //             break;
 
-            case AuthMethod.FACIAL:
-                if (!verifyDto.faceEncoding) {
-                    throw new BadRequestException('Face encoding is required');
-                }
-                employee = await this.findEmployeeByFaceEncoding(
-                    verifyDto.faceEncoding,
-                );
-                if (!employee) {
-                    throw new UnauthorizedException('Face not recognized');
-                }
-                break;
+    //         case AuthMethod.FACIAL:
+    //             if (!verifyDto.faceEncoding) {
+    //                 throw new BadRequestException('Face encoding is required');
+    //             }
+    //             employee = await this.findEmployeeByFaceEncoding(
+    //                 verifyDto.faceEncoding,
+    //             );
+    //             if (!employee) {
+    //                 throw new UnauthorizedException('Face not recognized');
+    //             }
+    //             break;
 
-            default:
-                throw new BadRequestException('Invalid authentication method');
-        }
+    //         default:
+    //             throw new BadRequestException('Invalid authentication method');
+    //     }
 
-        if (employee.status !== 'ACTIVE') {
-            throw new UnauthorizedException('Employee account is not active');
-        }
+    //     if (employee.status !== 'ACTIVE') {
+    //         throw new UnauthorizedException('Employee account is not active');
+    //     }
 
-        return {
-            employee: {
-                id: employee.id,
-                employeeId: employee.employeeId,
-                fullName: employee.fullName,
-                department: employee.department,
-                position: employee.position,
-                shift: employee.shift,
-            },
-            verified: true,
-        };
-    }
+    //     return {
+    //         employee: {
+    //             id: employee.id,
+    //             employeeId: employee.employeeId,
+    //             fullName: employee.fullName,
+    //             department: employee.department,
+    //             position: employee.position,
+    //             shift: employee.shift,
+    //         },
+    //         verified: true,
+    //     };
+    // }
 
 
 
@@ -657,6 +657,82 @@ export class AttendanceService {
             excellentPerformers: excellent,
             goodPerformers: good,
             poorPerformers: poor,
+        };
+    }
+
+
+    async verifyEmployee(verifyDto: VerifyEmployeeDto): Promise<any> {
+        let employee: Employee | null = null;
+
+        switch (verifyDto.method) {
+            case AuthMethod.RFID:
+                if (!verifyDto.rfidCardId) {
+                    throw new BadRequestException('RFID card ID is required');
+                }
+                employee = await this.employeesService.findByRfidCard(
+                    verifyDto.rfidCardId,
+                );
+                if (!employee) {
+                    throw new UnauthorizedException('RFID card not recognized');
+                }
+                break;
+
+            case AuthMethod.PIN:
+                if (!verifyDto.employeeId || !verifyDto.pinCode) {
+                    throw new BadRequestException('Employee ID and PIN are required');
+                }
+                employee = await this.employeesService.findByEmployeeId(verifyDto.employeeId);
+                const isPinValid = await this.employeesService.verifyPin(
+                    employee.id,
+                    verifyDto.pinCode,
+                );
+                if (!isPinValid) {
+                    throw new UnauthorizedException('Invalid PIN');
+                }
+                break;
+
+            case AuthMethod.FACIAL:
+                if (!verifyDto.faceEncoding) {
+                    throw new BadRequestException('Face encoding is required');
+                }
+                employee = await this.findEmployeeByFaceEncoding(
+                    verifyDto.faceEncoding,
+                );
+                if (!employee) {
+                    throw new UnauthorizedException('Face not recognized');
+                }
+                break;
+
+            case AuthMethod.FINGERPRINT:
+                if (!verifyDto.fingerprintTemplate) {
+                    throw new BadRequestException('Fingerprint template is required');
+                }
+                employee = await this.employeesService.verifyFingerprint(
+                    verifyDto.fingerprintTemplate,
+                );
+                if (!employee) {
+                    throw new UnauthorizedException('Fingerprint not recognized');
+                }
+                break;
+
+            default:
+                throw new BadRequestException('Invalid authentication method');
+        }
+
+        if (employee.status !== 'ACTIVE') {
+            throw new UnauthorizedException('Employee account is not active');
+        }
+
+        return {
+            employee: {
+                id: employee.id,
+                employeeId: employee.employeeId,
+                fullName: employee.fullName,
+                department: employee.department,
+                position: employee.position,
+                shift: employee.shift,
+            },
+            verified: true,
         };
     }
 }
