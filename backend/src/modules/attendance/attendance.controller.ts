@@ -1,4 +1,4 @@
-// src/modules/attendance/attendance.controller.ts
+// backend/src/modules/attendance/attendance.controller.ts
 import {
     Controller,
     Get,

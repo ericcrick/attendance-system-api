@@ -1,3 +1,5 @@
+//admin-dashboard/src/components/employees/FingerprintEnrollmentModal.tsx
+
 'use client';
 
 import { useState, useEffect } from 'react';

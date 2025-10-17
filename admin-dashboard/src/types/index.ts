@@ -1,3 +1,5 @@
+//admin-dashboard/src/types/index.ts
+
 export enum AuthMethod {
   RFID = 'RFID',
   PIN = 'PIN',
@@ -56,30 +58,7 @@ export interface Shift {
   updatedAt: string;
 }
 
-// src/types/index.ts - Update Employee interface
-// export interface Employee {
-//   id: string;
-//   employeeId: string;
-//   firstName: string;
-//   lastName: string;
-//   fullName: string;
-//   email?: string;
-//   phone?: string;
-//   department: string;
-//   departmentId?: string;
-//   position: string;
-//   rfidCardId?: string;
-//   pinCode?: string;
-//   photoUrl?: string;
-//   faceEncoding?: string;
-//   status: EmploymentStatus;
-//   shiftId: string;
-//   shift: Shift;
-//   dateJoined: string;
-//   notes?: string;
-//   createdAt: string;
-//   updatedAt: string;
-// }
+
 
 
 export interface Employee {
