@@ -59,7 +59,7 @@ export default function FacialAuth({ onSuccess }: FacialAuthProps) {
 
   const showAlert = (type: 'success' | 'error', message: string) => {
     setAlert({ type, message });
-    setTimeout(() => setAlert(null), 4000);
+    setTimeout(() => stopCamera(), 500);
   };
 
   const loadModels = async () => {
