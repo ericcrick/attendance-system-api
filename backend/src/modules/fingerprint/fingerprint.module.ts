@@ -1,44 +1,44 @@
+// backend/src/modules/fingerprint/fingerprint.module.ts
+
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { FingerprintController } from './fingerprint.controller';
-import { FingerprintBridgeService } from './fingerprint-bridge.service';
-import { FingerprintServiceFactory } from './fingerprint-device.factory';
 import { ZKTecoService } from './zkteco.service';
-import { DigitalPersonaService } from './digital-persona.service';
+
 import { IFingerprintService } from './fingerprint-service.interface';
+import { DigitalPersonaService } from './digitalpersona.service';
 
 @Module({
-    imports: [ConfigModule], // 👈 make sure ConfigModule is imported
-    controllers: [FingerprintController],
+    imports: [ConfigModule],
     providers: [
-        FingerprintBridgeService,
-        FingerprintServiceFactory,
+        // Concrete implementations
         ZKTecoService,
         DigitalPersonaService,
+
+        // Dynamic provider based on environment
         {
             provide: IFingerprintService,
             useFactory: (
                 config: ConfigService,
-                dp: DigitalPersonaService,
-                zk: ZKTecoService,
+                digitalPersona: DigitalPersonaService,
+                zkteco: ZKTecoService,
             ) => {
-                const type = config
+                const deviceType = config
                     .get<string>('FINGERPRINT_DEVICE_TYPE', 'DIGITAL_PERSONA')
-                    ?.toUpperCase();
+                    ?.toUpperCase()
+                    .replace(/[-\s]/g, '_');
 
-                console.log(`Active fingerprint device from .env: ${type}`);
+                console.log(`🔧 Active fingerprint service: ${deviceType}`);
 
-                return type === 'ZKTECO' ? zk : dp;
+                return deviceType === 'ZKTECO' ? zkteco : digitalPersona;
             },
             inject: [ConfigService, DigitalPersonaService, ZKTecoService],
         },
     ],
     exports: [
-        FingerprintBridgeService,
-        FingerprintServiceFactory,
-        ZKTecoService,
-        DigitalPersonaService,
-        IFingerprintService,
+        // Only export what's needed
+        IFingerprintService, // For injection in other modules
+        DigitalPersonaService, // If you need direct access
+        ZKTecoService, // If you need direct access
     ],
 })
 export class FingerprintModule { }

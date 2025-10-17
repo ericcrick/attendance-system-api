@@ -33,7 +33,7 @@ import { Employee } from './entities/employee.entity';
 @ApiBearerAuth('JWT-auth')
 @Controller('employees')
 export class EmployeesController {
-  constructor(private readonly employeesService: EmployeesService) {}
+  constructor(private readonly employeesService: EmployeesService) { }
 
   @Post()
   @ApiOperation({ summary: 'Create a new employee' })
@@ -238,24 +238,24 @@ export class EmployeesController {
   }
 
 
-  @Get('fingerprint/device-info')
-@ApiOperation({ summary: 'Get fingerprint device information' })
-@ApiResponse({ status: 200, description: 'Device information' })
-async getDeviceInfo() {
-  return this.employeesService.getFingerprintDeviceInfo();
-}
+  @Get('fingerprint/test')
+  @ApiOperation({ summary: 'Test fingerprint service' })
+  async testFingerprintService() {
+    return this.employeesService.testFingerprintService();
+  }
 
-@Post('fingerprint/test-connection')
-@ApiOperation({ summary: 'Test fingerprint device connection' })
-@ApiResponse({ status: 200, description: 'Connection test result' })
-async testDeviceConnection() {
-  return this.employeesService.testFingerprintDeviceConnection();
-}
+  @Post('fingerprint/compare')
+  @ApiOperation({ summary: 'Compare two fingerprint templates (testing)' })
+  async compareFingerprints(
+    @Body() body: { template1: string; template2: string },
+  ) {
+    const score = await this.employeesService['fingerprintService']
+      .compareFingerprintTemplates(body.template1, body.template2);
 
-@Post('fingerprint/sync-all')
-@ApiOperation({ summary: 'Sync all fingerprints to device' })
-@ApiResponse({ status: 200, description: 'Sync completed' })
-async syncAllFingerprints() {
-  return this.employeesService.syncAllFingerprintsToDevice();
-}
+    return {
+      similarityScore: score,
+      matched: score >= 70,
+      threshold: 70,
+    };
+  }
 }

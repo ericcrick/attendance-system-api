@@ -4,6 +4,8 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  Inject,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -21,14 +23,19 @@ import { ShiftsService } from '../shifts/shifts.service';
 import { DepartmentsService } from '../departments/departments.service';
 import { ZKTecoService } from '../fingerprint/zkteco.service';
 import { EmploymentStatus } from '../../common/enums';
+import { IFingerprintService } from '../fingerprint/fingerprint-service.interface';
 
 @Injectable()
 export class EmployeesService {
+  private readonly logger = new Logger(EmployeesService.name);
   constructor(
     @InjectRepository(Employee)
     private readonly employeesRepository: Repository<Employee>,
     private readonly shiftsService: ShiftsService,
     private readonly departmentsService: DepartmentsService,
+
+    @Inject(IFingerprintService)
+    private readonly fingerprintService: IFingerprintService,
     private readonly zkTecoService: ZKTecoService,
   ) { }
 
@@ -342,52 +349,6 @@ export class EmployeesService {
     return this.employeesRepository.save(employee);
   }
 
-  async assignFingerprint(
-    id: string,
-    assignFingerprintDto: AssignFingerprintDto,
-  ): Promise<Employee> {
-    const employee = await this.findOne(id);
-
-    // Validate fingerprint template
-    if (!this.zkTecoService.validateFingerprintTemplate(
-      assignFingerprintDto.fingerprintTemplate,
-    )) {
-      throw new BadRequestException('Invalid fingerprint template data');
-    }
-
-    // Enroll on device and get device user ID
-    const deviceUserId = await this.zkTecoService.enrollFingerprintOnDevice(
-      employee.employeeId,
-      assignFingerprintDto.fingerprintTemplate,
-    );
-
-    employee.fingerprintTemplate = assignFingerprintDto.fingerprintTemplate;
-    employee.fingerprintDeviceId = assignFingerprintDto.fingerprintDeviceId || deviceUserId;
-
-    return this.employeesRepository.save(employee);
-  }
-
-  async removeFingerprint(id: string): Promise<Employee> {
-    const employee = await this.findOne(id);
-
-    if (!employee.fingerprintTemplate) {
-      throw new BadRequestException('No fingerprint enrolled for this employee');
-    }
-
-    // Delete from device if device ID exists
-    if (employee.fingerprintDeviceId) {
-      await this.zkTecoService.deleteFingerprintFromDevice(
-        employee.fingerprintDeviceId,
-      );
-    }
-
-    // TypeScript fix: Set to null instead of undefined
-    employee.fingerprintTemplate = null as any;
-    employee.fingerprintDeviceId = null as any;
-
-    return this.employeesRepository.save(employee);
-  }
-
   async verifyPin(id: string, pinCode: string): Promise<boolean> {
     const employee = await this.findOne(id);
 
@@ -398,28 +359,167 @@ export class EmployeesService {
     return bcrypt.compare(pinCode, employee.pinCode);
   }
 
-  async verifyFingerprint(fingerprintTemplate: string): Promise<Employee | null> {
+
+  async assignFingerprint(
+    id: string,
+    assignFingerprintDto: AssignFingerprintDto,
+  ): Promise<Employee> {
+    const employee = await this.findOne(id);
+
+    // Validate fingerprint template
+    if (
+      !this.fingerprintService.validateFingerprintTemplate(
+        assignFingerprintDto.fingerprintTemplate,
+      )
+    ) {
+      throw new BadRequestException(
+        'Invalid fingerprint template data. Please ensure the fingerprint was captured correctly.',
+      );
+    }
+
+    // Check for duplicate fingerprint enrollment
+    const existingEmployee = await this.verifyFingerprint(
+      assignFingerprintDto.fingerprintTemplate,
+    );
+
+    if (existingEmployee && existingEmployee.id !== id) {
+      throw new ConflictException(
+        `This fingerprint is already enrolled for ${existingEmployee.fullName}. Each fingerprint must be unique.`,
+      );
+    }
+
+    // Enroll on device (for Digital Persona, this is mostly metadata)
+    const deviceUserId = await this.fingerprintService.enrollFingerprintOnDevice(
+      employee.employeeId,
+      assignFingerprintDto.fingerprintTemplate,
+    );
+
+    // Normalize and store template
+    const normalizedTemplate = this.fingerprintService.normalizeTemplate(
+      assignFingerprintDto.fingerprintTemplate,
+    );
+
+    employee.fingerprintTemplate = normalizedTemplate;
+    employee.fingerprintDeviceId =
+      assignFingerprintDto.fingerprintDeviceId || deviceUserId;
+
+    this.logger.log(
+      `✅ Fingerprint enrolled for ${employee.fullName} (${employee.employeeId})`,
+    );
+
+    return this.employeesRepository.save(employee);
+  }
+
+  async removeFingerprint(id: string): Promise<Employee> {
+    const employee = await this.findOne(id);
+
+    if (!employee.fingerprintTemplate) {
+      throw new BadRequestException(
+        'No fingerprint enrolled for this employee',
+      );
+    }
+
+    // Delete from device if device ID exists
+    if (employee.fingerprintDeviceId) {
+      await this.fingerprintService.deleteFingerprintFromDevice(
+        employee.fingerprintDeviceId,
+      );
+    }
+
+    employee.fingerprintTemplate = null as any
+    employee.fingerprintDeviceId = null as any
+
+    this.logger.log(
+      `🗑️ Fingerprint removed for ${employee.fullName} (${employee.employeeId})`,
+    );
+
+    return this.employeesRepository.save(employee);
+  }
+
+  async verifyFingerprint(
+    fingerprintTemplate: string,
+  ): Promise<Employee | null> {
+    const startTime = Date.now();
+
+    // Validate input template
+    if (!this.fingerprintService.validateFingerprintTemplate(fingerprintTemplate)) {
+      this.logger.warn('❌ Invalid fingerprint template provided for verification');
+      return null;
+    }
+
+    // Normalize input template
+    const normalizedInput =
+      this.fingerprintService.normalizeTemplate(fingerprintTemplate);
+
+    // Get all employees with fingerprints
     const employees = await this.findAll(false);
     const employeesWithFingerprints = employees.filter(
       (emp) => emp.fingerprintTemplate && emp.fingerprintTemplate.length > 0,
     );
 
+    this.logger.log(
+      `🔍 Verifying fingerprint against ${employeesWithFingerprints.length} enrolled templates`,
+    );
+
+    if (employeesWithFingerprints.length === 0) {
+      this.logger.warn('⚠️ No enrolled fingerprints found in database');
+      return null;
+    }
+
+    // Find best match
+    let bestMatch: Employee | null = null;
+    let highestScore = 0;
+    const matchResults: Array<{ employee: string; score: number }> = [];
+
     for (const employee of employeesWithFingerprints) {
-      // TypeScript fix: Check for null/undefined before passing
-      if (!employee.fingerprintTemplate) continue;
+      try {
+        const matchResult =
+          await this.fingerprintService.matchFingerprintsWithScore(
+            normalizedInput,
+            employee.fingerprintTemplate!,
+          );
 
-      const isMatch = await this.zkTecoService.matchFingerprints(
-        fingerprintTemplate,
-        employee.fingerprintTemplate,
-      );
+        matchResults.push({
+          employee: employee.fullName,
+          score: matchResult.score,
+        });
 
-      if (isMatch) {
-        return employee;
+        this.logger.debug(
+          `📊 ${employee.fullName}: ${matchResult.score.toFixed(2)}% (threshold: ${matchResult.threshold}%)`,
+        );
+
+        if (matchResult.matched && matchResult.score > highestScore) {
+          highestScore = matchResult.score;
+          bestMatch = employee;
+        }
+      } catch (error) {
+        this.logger.error(
+          `❌ Error matching fingerprint for ${employee.employeeId}:`,
+          error,
+        );
       }
     }
 
-    return null;
+    const duration = Date.now() - startTime;
+
+    if (bestMatch) {
+      this.logger.log(
+        `✅ MATCH FOUND: ${bestMatch.fullName} (${bestMatch.employeeId}) - Score: ${highestScore.toFixed(2)}% - Duration: ${duration}ms`,
+      );
+    } else {
+      // Log top 3 closest matches for debugging
+      const topMatches = matchResults
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 3);
+
+      this.logger.warn(
+        `❌ NO MATCH FOUND - Duration: ${duration}ms - Top matches: ${topMatches.map((m) => `${m.employee}(${m.score.toFixed(2)}%)`).join(', ')}`,
+      );
+    }
+
+    return bestMatch;
   }
+
 
   async getStatistics() {
     const [total, active, inactive, suspended, terminated] = await Promise.all([
@@ -460,7 +560,9 @@ export class EmployeesService {
     const withFingerprint = await this.employeesRepository
       .createQueryBuilder('employee')
       .where('employee.fingerprint_template IS NOT NULL')
-      .andWhere('employee.status = :status', { status: EmploymentStatus.ACTIVE })
+      .andWhere('employee.status = :status', {
+        status: EmploymentStatus.ACTIVE,
+      })
       .getCount();
 
     return {
@@ -480,6 +582,9 @@ export class EmployeesService {
     };
   }
 
+  async testFingerprintService(): Promise<any> {
+    return this.fingerprintService.testConnection();
+  }
 
   async getFingerprintDeviceInfo(): Promise<any> {
     return this.zkTecoService.getDeviceInfo();

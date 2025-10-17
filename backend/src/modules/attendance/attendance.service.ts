@@ -5,24 +5,27 @@ import {
     NotFoundException,
     BadRequestException,
     UnauthorizedException,
+    Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 import { Attendance } from './entities/attendance.entity';
 import { ClockInDto, ClockOutDto, VerifyEmployeeDto } from './dto/attendance.dto';
 import { EmployeesService } from '../employees/employees.service';
-import { AuthMethod, AttendanceStatus } from '../../common/enums';
+import { AuthMethod, AttendanceStatus, EmploymentStatus } from '../../common/enums';
 import { Employee } from '../employees/entities/employee.entity';
 import { LeavesService } from '../leaves/leaves.service';
 import { EmployeePerformance, LeaderboardQueryDto, TimePeriod } from './dto/leaderboard.dto';
 
 @Injectable()
 export class AttendanceService {
+    private readonly logger = new Logger(AttendanceService.name);
     constructor(
         @InjectRepository(Attendance)
         private readonly attendanceRepository: Repository<Attendance>,
         private readonly employeesService: EmployeesService,
         private readonly leavesService: LeavesService,
+
     ) { }
 
 
@@ -619,13 +622,15 @@ export class AttendanceService {
                 if (!verifyDto.employeeId || !verifyDto.pinCode) {
                     throw new BadRequestException('Employee ID and PIN are required');
                 }
-                employee = await this.employeesService.findByEmployeeId(verifyDto.employeeId);
+                employee = await this.employeesService.findByEmployeeId(
+                    verifyDto.employeeId,
+                );
                 const isPinValid = await this.employeesService.verifyPin(
                     employee.id,
                     verifyDto.pinCode,
                 );
                 if (!isPinValid) {
-                    throw new UnauthorizedException('Invalid PIN');
+                    throw new UnauthorizedException('Invalid PIN code');
                 }
                 break;
 
@@ -633,9 +638,7 @@ export class AttendanceService {
                 if (!verifyDto.faceEncoding) {
                     throw new BadRequestException('Face encoding is required');
                 }
-                employee = await this.findEmployeeByFaceEncoding(
-                    verifyDto.faceEncoding,
-                );
+                employee = await this.findEmployeeByFaceEncoding(verifyDto.faceEncoding);
                 if (!employee) {
                     throw new UnauthorizedException('Face not recognized');
                 }
@@ -645,20 +648,36 @@ export class AttendanceService {
                 if (!verifyDto.fingerprintTemplate) {
                     throw new BadRequestException('Fingerprint template is required');
                 }
+
+                this.logger.log(
+                    `🔐 Attempting fingerprint verification (template length: ${verifyDto.fingerprintTemplate.length})`,
+                );
+
                 employee = await this.employeesService.verifyFingerprint(
                     verifyDto.fingerprintTemplate,
                 );
+
                 if (!employee) {
-                    throw new UnauthorizedException('Fingerprint not recognized');
+                    this.logger.warn('❌ Fingerprint verification failed - no match found');
+                    throw new UnauthorizedException(
+                        'Fingerprint not recognized. Please try again or use an alternate method.',
+                    );
                 }
+
+                this.logger.log(
+                    `✅ Fingerprint verified: ${employee.fullName} (${employee.employeeId})`,
+                );
                 break;
 
             default:
                 throw new BadRequestException('Invalid authentication method');
         }
 
-        if (employee.status !== 'ACTIVE') {
-            throw new UnauthorizedException('Employee account is not active');
+        // Check employee status
+        if (employee.status !== EmploymentStatus.ACTIVE) {
+            throw new UnauthorizedException(
+                `Employee account is ${employee.status.toLowerCase()}. Please contact HR.`,
+            );
         }
 
         return {
@@ -674,3 +693,4 @@ export class AttendanceService {
         };
     }
 }
+

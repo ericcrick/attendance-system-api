@@ -1,7 +1,13 @@
-
 // backend/src/modules/fingerprint/zkteco.service.ts
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
-import { IFingerprintService, FingerprintDeviceInfo, FingerprintScanResult } from './fingerprint-service.interface';
+
+import { Injectable, BadRequestException, Logger, OnModuleDestroy } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import {
+  IFingerprintService,
+  FingerprintDeviceInfo,
+  FingerprintScanResult,
+  FingerprintMatchResult,
+} from './fingerprint-service.interface';
 
 // Fix ZKLib import - it's a CommonJS module
 let ZKLib: any;
@@ -16,12 +22,15 @@ try {
     ZKLib = ZKLib.ZKLib;
   }
 } catch (error) {
-  console.warn('ZKTeco library (zklib) not installed. ZKTeco features will be unavailable.');
+  console.warn(
+    'ZKTeco library (zklib) not installed. ZKTeco features will be unavailable.',
+  );
+  console.warn('Install with: npm install zklib');
   ZKLib = null;
 }
 
 @Injectable()
-export class ZKTecoService implements IFingerprintService {
+export class ZKTecoService extends IFingerprintService implements OnModuleDestroy {
   private readonly logger = new Logger(ZKTecoService.name);
   private deviceIp: string;
   private devicePort: number;
@@ -34,37 +43,116 @@ export class ZKTecoService implements IFingerprintService {
   private captureCallback: ((result: FingerprintScanResult) => void) | null = null;
   private captureInterval: NodeJS.Timeout | null = null;
   private zkLibAvailable: boolean = false;
+  private matchingThreshold: number;
+  private readonly minTemplateLength: number = 100;
 
-  constructor() {
-    this.deviceIp = process.env.ZKTECO_DEVICE_IP || '192.168.1.201';
-    this.devicePort = parseInt(process.env.ZKTECO_DEVICE_PORT || '4370');
-    this.devicePassword = process.env.ZKTECO_DEVICE_PASSWORD || '';
+  constructor(private configService: ConfigService) {
+    super();
+    this.deviceIp = this.configService.get<string>('ZKTECO_DEVICE_IP', '192.168.1.201');
+    this.devicePort = this.configService.get<number>('ZKTECO_DEVICE_PORT', 4370);
+    this.devicePassword = this.configService.get<string>('ZKTECO_DEVICE_PASSWORD', '');
+    this.matchingThreshold = this.configService.get<number>(
+      'FINGERPRINT_MATCH_THRESHOLD',
+      60,
+    );
     this.zkLibAvailable = ZKLib !== null;
-    
-    this.logger.log(`ZKTeco Service initialized for device at ${this.deviceIp}:${this.devicePort} (Library Available: ${this.zkLibAvailable})`);
+
+    this.logger.log(
+      `ZKTeco Service initialized for device at ${this.deviceIp}:${this.devicePort}`,
+    );
+    this.logger.log(`Library Available: ${this.zkLibAvailable}`);
+    this.logger.log(`Match Threshold: ${this.matchingThreshold}%`);
   }
 
+  /**
+   * Validate fingerprint template format
+   * ZKTeco templates are base64 encoded binary data
+   */
   validateFingerprintTemplate(template: string): boolean {
-    if (!template || template.length < 100) {
-      this.logger.warn('Fingerprint template too short');
+    try {
+      if (!template || typeof template !== 'string') {
+        this.logger.warn('Invalid template: null or not a string');
+        return false;
+      }
+
+      const cleaned = template.trim();
+
+      if (cleaned.length < this.minTemplateLength) {
+        this.logger.warn(
+          `Template too short: ${cleaned.length} < ${this.minTemplateLength}`,
+        );
+        return false;
+      }
+
+      // Check if valid base64
+      const base64Regex = /^[A-Za-z0-9+/]*={0,2}$|^[A-Za-z0-9_-]*={0,2}$/;
+      if (!base64Regex.test(cleaned)) {
+        this.logger.warn('Template is not valid base64');
+        return false;
+      }
+
+      // Try to decode
+      const decoded = Buffer.from(cleaned, 'base64');
+      if (decoded.length === 0) {
+        this.logger.warn('Template decodes to empty buffer');
+        return false;
+      }
+
+      // ZKTeco templates are typically 400-3000 bytes
+      const byteSize = decoded.length;
+      if (byteSize < 400 || byteSize > 3000) {
+        this.logger.warn(
+          `Fingerprint template size out of range: ${byteSize} bytes (expected 400-3000)`,
+        );
+        return false;
+      }
+
+      this.logger.debug(
+        `Template validated: length=${cleaned.length}, decoded=${byteSize} bytes`,
+      );
+      return true;
+    } catch (error) {
+      this.logger.error('Template validation error:', error);
       return false;
     }
-
-    const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
-    if (!base64Regex.test(template)) {
-      this.logger.warn('Invalid Base64 format for fingerprint template');
-      return false;
-    }
-
-    const estimatedByteSize = (template.length * 3) / 4;
-    if (estimatedByteSize < 400 || estimatedByteSize > 3000) {
-      this.logger.warn(`Fingerprint template size out of range: ${estimatedByteSize} bytes`);
-      return false;
-    }
-
-    return true;
   }
 
+  /**
+   * Normalize template format
+   * Handle both base64 and base64url formats
+   */
+  normalizeTemplate(template: string): string {
+    try {
+      let normalized = template.trim();
+
+      // Convert base64url to standard base64 if needed
+      normalized = normalized.replace(/-/g, '+').replace(/_/g, '/');
+
+      // Ensure proper padding
+      while (normalized.length % 4 !== 0) {
+        normalized += '=';
+      }
+
+      return normalized;
+    } catch (error) {
+      this.logger.error('Template normalization error:', error);
+      return template;
+    }
+  }
+
+  /**
+   * Extract quality score from template
+   * ZKTeco doesn't provide quality in template, return default
+   */
+  extractQuality(template: string): number {
+    // ZKTeco doesn't encode quality in template
+    // Return a default high quality score
+    return 85;
+  }
+
+  /**
+   * Connect to ZKTeco device
+   */
   async connectToDevice(): Promise<boolean> {
     try {
       if (this.isConnected && this.device) {
@@ -73,20 +161,24 @@ export class ZKTecoService implements IFingerprintService {
       }
 
       if (!this.zkLibAvailable) {
-        this.logger.warn('ZKTeco library not available. Install with: npm install zklib');
+        this.logger.warn(
+          'ZKTeco library not available. Install with: npm install zklib',
+        );
         return false;
       }
 
-      this.logger.log(`Attempting to connect to ZKTeco device at ${this.deviceIp}:${this.devicePort}`);
+      this.logger.log(
+        `Attempting to connect to ZKTeco device at ${this.deviceIp}:${this.devicePort}`,
+      );
 
-      // Create new device instance with proper constructor
+      // Create new device instance
       this.device = new ZKLib(this.deviceIp, this.devicePort, 10000, 4000);
-      
+
       await this.device.createSocket();
       this.isConnected = true;
       this.reconnectAttempts = 0;
 
-      this.logger.log('Successfully connected to ZKTeco device');
+      this.logger.log('✅ Successfully connected to ZKTeco device');
 
       const info = await this.getDeviceInfo();
       this.logger.log(`Device Info: ${JSON.stringify(info)}`);
@@ -94,19 +186,26 @@ export class ZKTecoService implements IFingerprintService {
       return true;
     } catch (error) {
       this.isConnected = false;
-      this.logger.error(`Failed to connect to ZKTeco device: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `❌ Failed to connect to ZKTeco device: ${error.message}`,
+      );
+
       if (this.reconnectAttempts < this.maxReconnectAttempts) {
         this.reconnectAttempts++;
-        this.logger.log(`Reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        this.logger.log(
+          `Reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 2000));
         return this.connectToDevice();
       }
-      
+
       return false;
     }
   }
 
+  /**
+   * Disconnect from device
+   */
   async disconnectFromDevice(): Promise<void> {
     try {
       if (this.isCapturing) {
@@ -117,13 +216,16 @@ export class ZKTecoService implements IFingerprintService {
         await this.device.disconnect();
         this.isConnected = false;
         this.device = null;
-        this.logger.log('Disconnected from ZKTeco device');
+        this.logger.log('🔌 Disconnected from ZKTeco device');
       }
     } catch (error) {
       this.logger.error('Error disconnecting from device:', error);
     }
   }
 
+  /**
+   * Ensure device is connected
+   */
   private async ensureConnection(): Promise<void> {
     if (!this.isConnected) {
       const connected = await this.connectToDevice();
@@ -133,6 +235,9 @@ export class ZKTecoService implements IFingerprintService {
     }
   }
 
+  /**
+   * Get device information
+   */
   async getDeviceInfo(): Promise<FingerprintDeviceInfo> {
     try {
       await this.ensureConnection();
@@ -146,6 +251,7 @@ export class ZKTecoService implements IFingerprintService {
       return {
         connected: this.isConnected,
         model: platform || 'ZKTeco',
+        manufacturer: 'ZKTeco',
         serialNumber: info?.serialNumber || 'Unknown',
         firmware: version || 'Unknown',
         ip: this.deviceIp,
@@ -156,6 +262,7 @@ export class ZKTecoService implements IFingerprintService {
       return {
         connected: false,
         model: 'ZKTeco',
+        manufacturer: 'ZKTeco',
         ip: this.deviceIp,
         port: this.devicePort,
       };
@@ -163,8 +270,132 @@ export class ZKTecoService implements IFingerprintService {
   }
 
   /**
+   * Compare two fingerprint templates
+   * Returns similarity score (0-100)
+   */
+  async compareFingerprintTemplates(
+    template1: string,
+    template2: string,
+  ): Promise<number> {
+    try {
+      if (
+        !this.validateFingerprintTemplate(template1) ||
+        !this.validateFingerprintTemplate(template2)
+      ) {
+        throw new BadRequestException('Invalid fingerprint template');
+      }
+
+      // Normalize templates
+      const norm1 = this.normalizeTemplate(template1);
+      const norm2 = this.normalizeTemplate(template2);
+
+      // Exact match check
+      if (norm1 === norm2) {
+        this.logger.debug('Exact template match found');
+        return 100;
+      }
+
+      const buffer1 = Buffer.from(norm1, 'base64');
+      const buffer2 = Buffer.from(norm2, 'base64');
+
+      return this.calculateTemplateSimilarity(buffer1, buffer2);
+    } catch (error) {
+      this.logger.error('Fingerprint comparison error:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Calculate template similarity using bit-level comparison
+   */
+  private calculateTemplateSimilarity(buffer1: Buffer, buffer2: Buffer): number {
+    try {
+      const minLength = Math.min(buffer1.length, buffer2.length);
+      const maxLength = Math.max(buffer1.length, buffer2.length);
+
+      if (minLength === 0) return 0;
+
+      let matchingBits = 0;
+      const totalBits = minLength * 8;
+
+      // Bit-level comparison with XOR
+      for (let i = 0; i < minLength; i++) {
+        const xor = buffer1[i] ^ buffer2[i];
+        matchingBits += 8 - this.countSetBits(xor);
+      }
+
+      // Calculate match rate
+      const matchRate = matchingBits / totalBits;
+
+      // Apply length penalty for different sized templates
+      const lengthPenalty = (maxLength - minLength) / maxLength;
+      const similarity = matchRate * (1 - lengthPenalty * 0.3);
+
+      const finalScore = Math.round(similarity * 10000) / 100;
+
+      this.logger.debug(
+        `Similarity: ${finalScore}% (match rate: ${(matchRate * 100).toFixed(2)}%, length penalty: ${(lengthPenalty * 100).toFixed(2)}%)`,
+      );
+
+      return finalScore;
+    } catch (error) {
+      this.logger.error('Error calculating template similarity:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Count set bits in a byte (Hamming weight)
+   */
+  private countSetBits(byte: number): number {
+    let count = 0;
+    while (byte) {
+      count += byte & 1;
+      byte >>= 1;
+    }
+    return count;
+  }
+
+  /**
+   * Match two fingerprints against threshold
+   */
+  async matchFingerprints(
+    template1: string,
+    template2: string,
+    threshold?: number,
+  ): Promise<boolean> {
+    const matchThreshold = threshold ?? this.matchingThreshold;
+    const score = await this.compareFingerprintTemplates(template1, template2);
+
+    this.logger.debug(
+      `Fingerprint match: score=${score}%, threshold=${matchThreshold}%, matched=${score >= matchThreshold}`,
+    );
+
+    return score >= matchThreshold;
+  }
+
+  /**
+   * Match fingerprints with detailed result
+   */
+  async matchFingerprintsWithScore(
+    template1: string,
+    template2: string,
+    threshold?: number,
+  ): Promise<FingerprintMatchResult> {
+    const matchThreshold = threshold ?? this.matchingThreshold;
+    const score = await this.compareFingerprintTemplates(template1, template2);
+    const matched = score >= matchThreshold;
+
+    return {
+      matched,
+      score: Math.round(score * 100) / 100,
+      threshold: matchThreshold,
+    };
+  }
+
+  /**
    * Capture a single fingerprint template
-   * ZKTeco devices work with real-time monitoring, so this polls for a scan
+   * ZKTeco devices work with real-time monitoring
    */
   async captureFingerprintTemplate(): Promise<FingerprintScanResult> {
     try {
@@ -178,7 +409,7 @@ export class ZKTecoService implements IFingerprintService {
         }
       }
 
-      this.logger.log('Waiting for fingerprint scan on ZKTeco device...');
+      this.logger.log('👆 Waiting for fingerprint scan on ZKTeco device...');
 
       return await new Promise<FingerprintScanResult>((resolve) => {
         let resolved = false;
@@ -207,7 +438,8 @@ export class ZKTecoService implements IFingerprintService {
             resolve({
               success: true,
               template: template,
-              quality: 85, // ZKTeco doesn't provide quality score
+              quality: 85,
+              timestamp: new Date(),
             });
 
             // Disable monitoring after capture
@@ -236,7 +468,9 @@ export class ZKTecoService implements IFingerprintService {
   /**
    * Start continuous fingerprint capture
    */
-  async startContinuousCapture(callback: (result: FingerprintScanResult) => void): Promise<void> {
+  async startContinuousCapture(
+    callback: (result: FingerprintScanResult) => void,
+  ): Promise<void> {
     try {
       if (!this.isConnected) {
         await this.connectToDevice();
@@ -250,7 +484,7 @@ export class ZKTecoService implements IFingerprintService {
       this.captureCallback = callback;
       this.isCapturing = true;
 
-      this.logger.log('Starting continuous fingerprint capture on ZKTeco...');
+      this.logger.log('🔄 Starting continuous fingerprint capture on ZKTeco...');
 
       // Enable real-time monitoring on the device
       await this.enableRealTimeMonitoring((data) => {
@@ -264,10 +498,10 @@ export class ZKTecoService implements IFingerprintService {
             success: true,
             template: template,
             quality: 85,
+            timestamp: new Date(),
           });
         }
       });
-
     } catch (error) {
       this.isCapturing = false;
       this.logger.error('Failed to start continuous capture:', error);
@@ -284,7 +518,7 @@ export class ZKTecoService implements IFingerprintService {
         return;
       }
 
-      this.logger.log('Stopping continuous capture...');
+      this.logger.log('⏹️ Stopping continuous capture...');
 
       await this.disableRealTimeMonitoring();
 
@@ -304,6 +538,9 @@ export class ZKTecoService implements IFingerprintService {
     }
   }
 
+  /**
+   * Enroll fingerprint on ZKTeco device
+   */
   async enrollFingerprintOnDevice(
     employeeId: string,
     fingerprintTemplate: string,
@@ -315,12 +552,16 @@ export class ZKTecoService implements IFingerprintService {
         throw new BadRequestException('Invalid fingerprint template');
       }
 
-      const templateBuffer = Buffer.from(fingerprintTemplate, 'base64');
+      const normalizedTemplate = this.normalizeTemplate(fingerprintTemplate);
+      const templateBuffer = Buffer.from(normalizedTemplate, 'base64');
       const timestamp = Date.now();
       const deviceUserId = (timestamp % 1000000).toString();
 
-      this.logger.log(`Enrolling fingerprint for employee ${employeeId} with device ID ${deviceUserId}`);
+      this.logger.log(
+        `📝 Enrolling fingerprint for employee ${employeeId} with device ID ${deviceUserId}`,
+      );
 
+      // Create user on device
       const userData = {
         uid: parseInt(deviceUserId),
         userId: employeeId,
@@ -332,157 +573,61 @@ export class ZKTecoService implements IFingerprintService {
 
       await this.device.setUser(userData);
 
+      // Store fingerprint template
       const templateData = {
         uid: parseInt(deviceUserId),
-        fid: 0,
+        fid: 0, // Finger index (0-9)
         valid: 1,
         template: templateBuffer,
       };
 
       await this.device.setTemplate(templateData);
 
-      this.logger.log(`Successfully enrolled fingerprint for ${employeeId}`);
+      this.logger.log(`✅ Successfully enrolled fingerprint for ${employeeId}`);
 
       return deviceUserId;
     } catch (error) {
-      this.logger.error(`Device enrollment error for ${employeeId}:`, error);
-      throw new BadRequestException(`Failed to enroll fingerprint on device: ${error.message}`);
+      this.logger.error(`❌ Device enrollment error for ${employeeId}:`, error);
+      throw new BadRequestException(
+        `Failed to enroll fingerprint on device: ${error.message}`,
+      );
     }
   }
 
-  async deleteFingerprintFromDevice(deviceUserId: string): Promise<boolean> {
+  /**
+   * Delete fingerprint from device
+   */
+  async deleteFingerprintFromDevice(deviceUserId: string): Promise<void> {
     try {
       await this.ensureConnection();
 
-      this.logger.log(`Deleting fingerprint with device ID: ${deviceUserId}`);
+      this.logger.log(`🗑️ Deleting fingerprint with device ID: ${deviceUserId}`);
       await this.device.deleteUser(parseInt(deviceUserId));
-      this.logger.log(`Successfully deleted fingerprint for device ID ${deviceUserId}`);
-
-      return true;
+      this.logger.log(
+        `✅ Successfully deleted fingerprint for device ID ${deviceUserId}`,
+      );
     } catch (error) {
-      this.logger.error(`Device deletion error for ${deviceUserId}:`, error);
-      return false;
+      this.logger.error(`❌ Device deletion error for ${deviceUserId}:`, error);
+      throw new BadRequestException(
+        `Failed to delete fingerprint from device: ${error.message}`,
+      );
     }
   }
 
-  async getAllUsersFromDevice(): Promise<any[]> {
-    try {
-      await this.ensureConnection();
-      const users = await this.device.getUsers();
-      return users?.data || [];
-    } catch (error) {
-      this.logger.error('Failed to get users from device:', error);
-      return [];
-    }
-  }
-
-  async getAllTemplatesFromDevice(): Promise<any[]> {
-    try {
-      await this.ensureConnection();
-      const templates = await this.device.getTemplates();
-      return templates?.data || [];
-    } catch (error) {
-      this.logger.error('Failed to get templates from device:', error);
-      return [];
-    }
-  }
-
-  async verifyFingerprintOnDevice(fingerprintTemplate: string): Promise<string | null> {
-    try {
-      await this.ensureConnection();
-
-      if (!this.validateFingerprintTemplate(fingerprintTemplate)) {
-        throw new BadRequestException('Invalid fingerprint template');
-      }
-
-      const deviceTemplates = await this.getAllTemplatesFromDevice();
-      const inputBuffer = Buffer.from(fingerprintTemplate, 'base64');
-
-      for (const template of deviceTemplates) {
-        const deviceBuffer = template.template;
-        const similarity = this.calculateTemplateSimilarity(inputBuffer, deviceBuffer);
-        const threshold = parseFloat(process.env.FINGERPRINT_MATCH_THRESHOLD || '60');
-
-        if (similarity >= threshold) {
-          this.logger.log(`Fingerprint matched with similarity ${similarity}%`);
-          return template.userId;
-        }
-      }
-
-      this.logger.log('No matching fingerprint found on device');
-      return null;
-    } catch (error) {
-      this.logger.error('Fingerprint verification error:', error);
-      return null;
-    }
-  }
-
-  async compareFingerprintTemplates(template1: string, template2: string): Promise<number> {
-    try {
-      if (!this.validateFingerprintTemplate(template1) ||
-        !this.validateFingerprintTemplate(template2)) {
-        throw new BadRequestException('Invalid fingerprint template');
-      }
-
-      if (template1 === template2) {
-        return 100;
-      }
-
-      const buffer1 = Buffer.from(template1, 'base64');
-      const buffer2 = Buffer.from(template2, 'base64');
-
-      return this.calculateTemplateSimilarity(buffer1, buffer2);
-    } catch (error) {
-      this.logger.error('Fingerprint comparison error:', error);
-      return 0;
-    }
-  }
-
-  private calculateTemplateSimilarity(buffer1: Buffer, buffer2: Buffer): number {
-    try {
-      const minLength = Math.min(buffer1.length, buffer2.length);
-      let matchingBytes = 0;
-      let totalBits = minLength * 8;
-
-      for (let i = 0; i < minLength; i++) {
-        const xor = buffer1[i] ^ buffer2[i];
-        matchingBytes += 8 - this.countSetBits(xor);
-      }
-
-      const similarity = (matchingBytes / totalBits) * 100;
-      return Math.round(similarity * 100) / 100;
-    } catch (error) {
-      this.logger.error('Error calculating template similarity:', error);
-      return 0;
-    }
-  }
-
-  private countSetBits(byte: number): number {
-    let count = 0;
-    while (byte) {
-      count += byte & 1;
-      byte >>= 1;
-    }
-    return count;
-  }
-
-  async matchFingerprints(template1: string, template2: string, threshold?: number): Promise<boolean> {
-    const matchThreshold = threshold || parseFloat(process.env.FINGERPRINT_MATCH_THRESHOLD || '60');
-    const similarity = await this.compareFingerprintTemplates(template1, template2);
-
-    this.logger.log(`Fingerprint match similarity: ${similarity}%, threshold: ${matchThreshold}%`);
-
-    return similarity >= matchThreshold;
-  }
-
+  /**
+   * Sync multiple fingerprints to device
+   */
   async syncFingerprintsToDevice(
-    employees: Array<{ id: string; employeeId: string; fingerprintTemplate: string }>,
-  ): Promise<{ success: number; failed: number; errors: string[] }> {
+    employees: Array<{
+      id: string;
+      employeeId: string;
+      fingerprintTemplate: string;
+    }>,
+  ): Promise<{ success: number; failed: number }> {
     let success = 0;
     let failed = 0;
-    const errors: string[] = [];
 
-    this.logger.log(`Starting sync of ${employees.length} fingerprints to device`);
+    this.logger.log(`🔄 Starting sync of ${employees.length} fingerprints to device`);
 
     try {
       await this.ensureConnection();
@@ -499,28 +644,131 @@ export class ZKTecoService implements IFingerprintService {
           );
           success++;
 
-          await new Promise(resolve => setTimeout(resolve, 100));
+          // Small delay to avoid overwhelming the device
+          await new Promise((resolve) => setTimeout(resolve, 100));
         } catch (error) {
           failed++;
-          errors.push(`${employee.employeeId}: ${error.message}`);
           this.logger.error(`Failed to sync ${employee.employeeId}:`, error);
         }
       }
 
-      this.logger.log(`Sync completed. Success: ${success}, Failed: ${failed}`);
+      this.logger.log(
+        `✅ Sync completed. Success: ${success}, Failed: ${failed}`,
+      );
     } catch (error) {
       this.logger.error('Sync operation failed:', error);
       throw new BadRequestException(`Sync operation failed: ${error.message}`);
     }
 
-    return { success, failed, errors };
+    return { success, failed };
   }
 
+  /**
+   * Test device connection
+   */
+  async testConnection(): Promise<{
+    success: boolean;
+    message: string;
+    info?: any;
+  }> {
+    try {
+      const connected = await this.connectToDevice();
+
+      if (!connected) {
+        return {
+          success: false,
+          message: 'Failed to connect to ZKTeco device',
+        };
+      }
+
+      const info = await this.getDeviceInfo();
+
+      return {
+        success: true,
+        message: 'Successfully connected to ZKTeco device',
+        info,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Connection test failed: ${error.message}`,
+      };
+    }
+  }
+
+  /**
+   * Get all users from device
+   */
+  async getAllUsersFromDevice(): Promise<any[]> {
+    try {
+      await this.ensureConnection();
+      const users = await this.device.getUsers();
+      return users?.data || [];
+    } catch (error) {
+      this.logger.error('Failed to get users from device:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get all templates from device
+   */
+  async getAllTemplatesFromDevice(): Promise<any[]> {
+    try {
+      await this.ensureConnection();
+      const templates = await this.device.getTemplates();
+      return templates?.data || [];
+    } catch (error) {
+      this.logger.error('Failed to get templates from device:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Enable real-time monitoring
+   */
+  private async enableRealTimeMonitoring(callback: (data: any) => void): Promise<void> {
+    try {
+      await this.ensureConnection();
+
+      this.logger.log('🔍 Enabling real-time monitoring');
+
+      this.device.on('realtime_log', (data: any) => {
+        this.logger.debug('Real-time log event:', data);
+        callback(data);
+      });
+
+      await this.device.enableRealtime();
+    } catch (error) {
+      this.logger.error('Failed to enable real-time monitoring:', error);
+      throw new BadRequestException(
+        `Failed to enable real-time monitoring: ${error.message}`,
+      );
+    }
+  }
+
+  /**
+   * Disable real-time monitoring
+   */
+  private async disableRealTimeMonitoring(): Promise<void> {
+    try {
+      if (this.device && this.isConnected) {
+        await this.device.disableRealtime();
+        this.logger.log('⏹️ Real-time monitoring disabled');
+      }
+    } catch (error) {
+      this.logger.error('Failed to disable real-time monitoring:', error);
+    }
+  }
+
+  /**
+   * Clear all data from device
+   */
   async clearAllDataFromDevice(): Promise<boolean> {
     try {
       await this.ensureConnection();
 
-      this.logger.log('Clearing all data from device');
+      this.logger.log('🗑️ Clearing all data from device');
 
       await this.device.clearAttendanceLog();
 
@@ -530,7 +778,7 @@ export class ZKTecoService implements IFingerprintService {
         await this.device.deleteUser(user.uid);
       }
 
-      this.logger.log('Successfully cleared all data from device');
+      this.logger.log('✅ Successfully cleared all data from device');
 
       return true;
     } catch (error) {
@@ -539,6 +787,9 @@ export class ZKTecoService implements IFingerprintService {
     }
   }
 
+  /**
+   * Get attendance logs from device
+   */
   async getAttendanceLogs(): Promise<any[]> {
     try {
       await this.ensureConnection();
@@ -562,61 +813,9 @@ export class ZKTecoService implements IFingerprintService {
     }
   }
 
-  async enableRealTimeMonitoring(callback: (data: any) => void): Promise<void> {
-    try {
-      await this.ensureConnection();
-
-      this.logger.log('Enabling real-time monitoring');
-
-      this.device.on('realtime_log', (data: any) => {
-        this.logger.log('Real-time log event:', data);
-        callback(data);
-      });
-
-      await this.device.enableRealtime();
-    } catch (error) {
-      this.logger.error('Failed to enable real-time monitoring:', error);
-      throw new BadRequestException(`Failed to enable real-time monitoring: ${error.message}`);
-    }
-  }
-
-  async disableRealTimeMonitoring(): Promise<void> {
-    try {
-      if (this.device && this.isConnected) {
-        await this.device.disableRealtime();
-        this.logger.log('Real-time monitoring disabled');
-      }
-    } catch (error) {
-      this.logger.error('Failed to disable real-time monitoring:', error);
-    }
-  }
-
-  async testConnection(): Promise<{ success: boolean; message: string; info?: any }> {
-    try {
-      const connected = await this.connectToDevice();
-
-      if (!connected) {
-        return {
-          success: false,
-          message: 'Failed to connect to device',
-        };
-      }
-
-      const info = await this.getDeviceInfo();
-
-      return {
-        success: true,
-        message: 'Successfully connected to device',
-        info,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: `Connection test failed: ${error.message}`,
-      };
-    }
-  }
-
+  /**
+   * Module destroy hook - cleanup
+   */
   async onModuleDestroy() {
     await this.disconnectFromDevice();
   }

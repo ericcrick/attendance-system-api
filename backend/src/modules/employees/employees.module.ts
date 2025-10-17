@@ -7,11 +7,12 @@ import { ShiftsModule } from '../shifts/shifts.module';
 import { DepartmentsModule } from '../departments/departments.module';
 
 import { FingerprintModule } from '../fingerprint/fingerprint.module';
+import { ConfigModule } from '@nestjs/config';
 
 
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Employee]), ShiftsModule, DepartmentsModule, FingerprintModule],
+  imports: [TypeOrmModule.forFeature([Employee]), ShiftsModule, DepartmentsModule, FingerprintModule, ConfigModule],
   controllers: [EmployeesController],
   providers: [EmployeesService],
   exports: [EmployeesService],

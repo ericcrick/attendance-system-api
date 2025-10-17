@@ -1,4 +1,4 @@
-//kiosk-app/src/lib/fingerprint-service.ts
+// admin-dashboard/src/lib/fingerprint-service.ts
 
 export class FingerprintService {
     private sdk: any = null;
