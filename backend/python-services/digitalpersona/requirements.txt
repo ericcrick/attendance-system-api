@@ -1,0 +1,9 @@
+# python-services/digitalpersona/requirements.txt
+flask==3.0.0
+flask-cors==4.0.0
+pillow==10.1.0
+numpy==1.26.2
+python-dotenv==1.0.0
+dpfpdd==1.0.0  # DigitalPersona SDK - if available
+# Alternative: pyfingerprint or custom USB library
+pyusb==1.2.1

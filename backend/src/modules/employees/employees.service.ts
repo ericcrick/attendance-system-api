@@ -19,7 +19,7 @@ import {
 } from './dto/create-employee.dto';
 import { ShiftsService } from '../shifts/shifts.service';
 import { DepartmentsService } from '../departments/departments.service';
-import { ZKTecoService } from './fingerprint/zkteco.service';
+import { ZKTecoService } from '../fingerprint/zkteco.service';
 import { EmploymentStatus } from '../../common/enums';
 
 @Injectable()

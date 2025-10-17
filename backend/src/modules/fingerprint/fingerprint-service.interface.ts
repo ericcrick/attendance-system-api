@@ -1,4 +1,4 @@
-// backend/src/modules/employees/fingerprint/fingerprint-service.interface.ts
+// backend/src/modules/fingerprint/fingerprint-service.interface.ts
 
 export interface FingerprintDeviceInfo {
   connected: boolean;
